@@ -16,7 +16,7 @@ import { Reveal, Stagger, Item, Counter } from './reveal'
 // The link goes live once that GitHub release is published with this .exe attached;
 // fix this one line if your owner/repo or tag differs.
 const DOWNLOAD_URL =
-  'https://github.com/throttledph/aplomb/releases/download/v0.13.3/Aplomb-Windows-0.13.3-Setup.exe'
+  'https://github.com/throttledph-coder/aplomb/releases/download/v0.13.3/Aplomb-Windows-0.13.3-Setup.exe'
 // Lemon Squeezy buy-link isn't set up yet → "Get Pro" routes to the download CTA
 // (Pro is unlocked in-app via Account → Upgrade). Swap in the LS URL later.
 const PRO_CHECKOUT_URL = '#download'
