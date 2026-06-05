@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy — Aplomb</title>
+    <style>
+      :root { --bg:hsl(60 3% 9%); --card:hsl(60 3% 14%); --border:hsl(60 2% 22%); --fg:hsl(60 9% 96%); --muted:hsl(60 4% 64%); --primary:hsl(15 63% 60%); }
+      *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.6}
+      a{color:var(--primary);text-decoration:none} a:hover{text-decoration:underline}
+      .wrap{max-width:780px;margin:0 auto;padding:0 24px}
+      header{border-bottom:1px solid var(--border)} header .wrap{display:flex;align-items:center;height:64px}
+      .brand{font-weight:700;font-size:18px;color:var(--fg)} .brand span{color:var(--primary)}
+      main{padding:48px 0 72px}
+      h1{font-size:32px;letter-spacing:-.02em;margin:0 0 6px}
+      .upd{color:var(--muted);font-size:14px;margin:0 0 28px}
+      h2{font-size:19px;margin:32px 0 8px}
+      p,li{color:var(--fg);font-size:15.5px} .muted,.note{color:var(--muted)}
+      .note{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;font-size:14px}
+      ul{padding-left:20px} li{margin:4px 0}
+      footer{border-top:1px solid var(--border);color:var(--muted);font-size:14px} footer .wrap{padding:24px 24px}
+    </style>
+  </head>
+  <body>
+    <header><div class="wrap"><a class="brand" href="/"><span>◆</span> Aplomb</a></div></header>
+    <main class="wrap">
+      <h1>Privacy Policy</h1>
+      <p class="upd">Last updated: June 3, 2026</p>
+      <p class="note">This is a general template provided for transparency and is not legal advice. Review and
+      adapt it (including your legal entity details) before relying on it.</p>
+
+      <h2>Summary</h2>
+      <p>Aplomb is a desktop application for interview preparation. Your resume, job descriptions, and
+      practice answers are processed on your computer and/or by the AI provider you choose, and are
+      <strong>not</strong> sent to or stored on our servers. We only handle the minimum needed to run your
+      account and (optionally) a Pro subscription.</p>
+
+      <h2>What we collect</h2>
+      <ul>
+        <li><strong>Account email</strong> — when you create an account, our authentication provider
+          (Supabase) stores your email and an encrypted password to sign you in.</li>
+        <li><strong>Profile</strong> — the name, preferred name, and optional pronouns/birthday you enter
+          are stored with your account to personalize your greeting and help the AI tailor answers. You can
+          edit or clear these any time in Account.</li>
+        <li><strong>Subscription status</strong> — if you buy Pro, our payment provider (Lemon Squeezy)
+          notifies us of your subscription state (active/cancelled and renewal date), linked to your
+          account ID.</li>
+      </ul>
+
+      <h2>What we do NOT collect</h2>
+      <ul>
+        <li>Your <strong>resume, job descriptions, additional info, questions, or AI answers</strong>. These
+          stay in a local database on your device.</li>
+        <li>Your <strong>AI API key</strong> is stored encrypted on your device and never sent to us.</li>
+        <li>Payment card details — these are handled entirely by Lemon Squeezy; we never see them.</li>
+      </ul>
+
+      <h2>AI processing</h2>
+      <p>To generate answers, the app sends your resume + job description to the AI provider <em>you</em>
+      configure: Groq (cloud, using your own key) or Ollama (fully local). This is your choice; using Ollama
+      keeps everything on your machine. See each provider's own policy for how they handle requests.</p>
+
+      <h2>Service providers (subprocessors)</h2>
+      <ul>
+        <li><strong>Supabase</strong> — account authentication + subscription records.</li>
+        <li><strong>Lemon Squeezy</strong> — payments and subscription management (Merchant of Record).</li>
+        <li><strong>Cloudflare</strong> — website hosting and the subscription webhook.</li>
+      </ul>
+
+      <h2>Data retention &amp; your rights</h2>
+      <p>We keep your account email and subscription status while your account exists. You can request access
+      to, correction of, or deletion of your account data by emailing
+      <a href="mailto:hello@aplomb.app">hello@aplomb.app</a>. Deleting the app removes your local data from
+      your device.</p>
+
+      <h2>Selling data</h2>
+      <p>We do not sell your personal data.</p>
+
+      <h2>Changes</h2>
+      <p>We may update this policy; the “Last updated” date will change accordingly.</p>
+
+      <h2>Contact</h2>
+      <p><a href="mailto:hello@aplomb.app">hello@aplomb.app</a></p>
+    </main>
+    <footer><div class="wrap">Aplomb · <a href="/terms.html">Terms</a> · <a href="/refund.html">Refund policy</a></div></footer>
+  </body>
+</html>

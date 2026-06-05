@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Light = Claude warm cream */
+  :root {
+    --background: 48 30% 97%;
+    --foreground: 30 8% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 30 8% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 30 8% 16%;
+    --primary: 15 63% 53%;
+    --primary-foreground: 48 30% 98%;
+    --secondary: 40 12% 92%;
+    --secondary-foreground: 30 8% 20%;
+    --muted: 40 12% 92%;
+    --muted-foreground: 30 6% 42%;
+    --accent: 40 14% 90%;
+    --accent-foreground: 30 8% 20%;
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 48 30% 98%;
+    --border: 40 10% 86%;
+    --input: 40 10% 86%;
+    --ring: 15 63% 53%;
+    --radius: 0.5rem;
+  }
+
+  /* Dark = Claude warm charcoal + coral accent */
+  .dark {
+    --background: 60 3% 14%;
+    --foreground: 48 22% 96%;
+    --card: 60 3% 17%;
+    --card-foreground: 48 22% 96%;
+    --popover: 60 3% 17%;
+    --popover-foreground: 48 22% 96%;
+    --primary: 15 63% 60%;
+    --primary-foreground: 60 5% 12%;
+    --secondary: 60 3% 22%;
+    --secondary-foreground: 48 22% 96%;
+    --muted: 60 3% 22%;
+    --muted-foreground: 48 8% 66%;
+    --accent: 60 3% 24%;
+    --accent-foreground: 48 22% 96%;
+    --destructive: 0 62% 47%;
+    --destructive-foreground: 48 22% 96%;
+    --border: 60 3% 24%;
+    --input: 60 3% 24%;
+    --ring: 15 63% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Modern themed scrollbars (warm, thin, rounded) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.55);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Visible keyboard-focus ring on every focusable element. :where() keeps
+     specificity at 0 so it never overrides shadcn's own focus styles. */
+  :where(a, button, [role='button'], input, textarea, select, [tabindex]):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+/* Respect the OS "reduce motion" preference — calms pulsing dots, the
+   active-session ping, sound-wave + smooth-scroll motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
