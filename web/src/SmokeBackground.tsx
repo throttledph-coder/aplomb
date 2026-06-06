@@ -63,11 +63,14 @@ class Renderer {
   }
 
   updateScale() {
-    const dpr = Math.max(1, window.devicePixelRatio)
+    // Cap DPR (phones report 2–3 → 4–9× fill rate on a heavy shader) and render
+    // at 0.7× internally; CSS upscales the soft smoke with no visible loss.
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+    const SCALE = 0.7
     const w = this.canvas.clientWidth || window.innerWidth
     const h = this.canvas.clientHeight || window.innerHeight
-    this.canvas.width = w * dpr
-    this.canvas.height = h * dpr
+    this.canvas.width = Math.max(1, Math.round(w * dpr * SCALE))
+    this.canvas.height = Math.max(1, Math.round(h * dpr * SCALE))
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height)
   }
 
@@ -169,16 +172,51 @@ export function SmokeBackground({ smokeColor = '#d97757', className }: SmokeBack
     onResize()
     window.addEventListener('resize', onResize)
 
+    // On reduced-motion or small screens (where mobile GPUs struggle most and the
+    // hero scrolls away fast), render a single static frame — no rAF loop.
+    const reduce =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ||
+      window.matchMedia?.('(max-width: 680px)').matches
+    if (reduce) {
+      renderer.render(1600) // one warmed frame
+      return () => {
+        window.removeEventListener('resize', onResize)
+        renderer.dispose()
+      }
+    }
+
+    // Animate, but only while the canvas is on-screen and the tab is visible.
     let raf = 0
+    let onScreen = true
     const loop = (now: number) => {
       renderer.render(now)
       raf = requestAnimationFrame(loop)
     }
-    raf = requestAnimationFrame(loop)
+    const start = () => {
+      if (!raf && onScreen && !document.hidden) raf = requestAnimationFrame(loop)
+    }
+    const stop = () => {
+      if (raf) cancelAnimationFrame(raf)
+      raf = 0
+    }
+
+    const io = new IntersectionObserver(
+      ([e]) => {
+        onScreen = e.isIntersecting
+        onScreen ? start() : stop()
+      },
+      { threshold: 0 },
+    )
+    io.observe(canvas)
+    const onVis = () => (document.hidden ? stop() : start())
+    document.addEventListener('visibilitychange', onVis)
+    start()
 
     return () => {
       window.removeEventListener('resize', onResize)
-      if (raf) cancelAnimationFrame(raf)
+      document.removeEventListener('visibilitychange', onVis)
+      io.disconnect()
+      stop()
       renderer.dispose()
     }
   }, [smokeColor])
