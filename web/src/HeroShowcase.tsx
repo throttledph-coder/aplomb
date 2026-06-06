@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { AplombMark } from './Logo'
 
 /* ---- tiny inline icons ---- */
@@ -27,11 +27,11 @@ const I = {
   ),
 }
 
-/* ---- typewriter ---- */
-function Typewriter({ text, cps = 42, run, reduce }: { text: string; cps?: number; run: boolean; reduce: boolean }) {
-  const [n, setN] = useState(reduce ? text.length : 0)
+/* ---- typewriter (always animates while run=true) ---- */
+function Typewriter({ text, cps = 42, run }: { text: string; cps?: number; run: boolean }) {
+  const [n, setN] = useState(0)
   useEffect(() => {
-    if (reduce || !run) {
+    if (!run) {
       setN(text.length)
       return
     }
@@ -43,12 +43,11 @@ function Typewriter({ text, cps = 42, run, reduce }: { text: string; cps?: numbe
       if (i >= text.length) clearInterval(id)
     }, 1000 / cps)
     return () => clearInterval(id)
-  }, [text, cps, run, reduce])
-  const typing = !reduce && run && n < text.length
+  }, [text, cps, run])
   return (
     <>
       {text.slice(0, n)}
-      {typing && <span className="caret" />}
+      {run && n < text.length && <span className="caret" />}
     </>
   )
 }
@@ -67,22 +66,17 @@ const fade = {
   transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const },
 }
 
-/* ---- Slide 1: animated chat ---- */
-function SlideChat({ reduce }: { reduce: boolean }) {
-  const [loop, setLoop] = useState(0)
-  const [step, setStep] = useState(reduce ? 3 : 0) // 1 q1 · 2 answer · 3 q2
-
+/* ---- Slide 1: animated chat (plays once per mount; carousel remounts to replay) ---- */
+function SlideChat() {
+  const [step, setStep] = useState(0) // 1 q1 · 2 answer · 3 q2
   useEffect(() => {
-    if (reduce) return
-    setStep(0)
     const t = [
       setTimeout(() => setStep(1), 300),
       setTimeout(() => setStep(2), 1200),
-      setTimeout(() => setStep(3), 4600),
-      setTimeout(() => setLoop((l) => l + 1), 8600),
+      setTimeout(() => setStep(3), 5000),
     ]
     return () => t.forEach(clearTimeout)
-  }, [loop, reduce])
+  }, [])
 
   return (
     <div className="demo">
@@ -95,7 +89,6 @@ function SlideChat({ reduce }: { reduce: boolean }) {
         <motion.div className="bubble ai" {...fade}>
           <Typewriter
             run={step === 2}
-            reduce={reduce}
             text="I owned a billing escalation end-to-end: acknowledged the error, walked them through the refund, looped in finance, and followed up next day. They stayed — and later upgraded."
           />
         </motion.div>
@@ -114,24 +107,19 @@ function SlideChat({ reduce }: { reduce: boolean }) {
 }
 
 /* ---- Slide 2: animated Pro demo (listen → transcribe → combine → answer + stealth) ---- */
-function SlidePro({ reduce }: { reduce: boolean }) {
-  const [loop, setLoop] = useState(0)
+function SlidePro() {
   // 0 listening · 1 transcribing · 2 heard#1 · 3 heard#2 · 4 combined · 5 answer
-  const [step, setStep] = useState(reduce ? 5 : 0)
-
+  const [step, setStep] = useState(0)
   useEffect(() => {
-    if (reduce) return
-    setStep(0)
     const t = [
       setTimeout(() => setStep(1), 700),
-      setTimeout(() => setStep(2), 2600),
-      setTimeout(() => setStep(3), 3600),
-      setTimeout(() => setStep(4), 5200),
-      setTimeout(() => setStep(5), 6400),
-      setTimeout(() => setLoop((l) => l + 1), 10500),
+      setTimeout(() => setStep(2), 2700),
+      setTimeout(() => setStep(3), 3900),
+      setTimeout(() => setStep(4), 5500),
+      setTimeout(() => setStep(5), 6900),
     ]
     return () => t.forEach(clearTimeout)
-  }, [loop, reduce])
+  }, [])
 
   return (
     <div className="demo demo-pro">
@@ -144,12 +132,12 @@ function SlidePro({ reduce }: { reduce: boolean }) {
       {step >= 1 && (
         <motion.div className="bubble them" {...fade}>
           <span className="who">Interviewer</span>
-          <Typewriter run={step === 1} reduce={reduce} text="So, why do you want to work here?" />
+          <Typewriter run={step === 1} text="So, why do you want to work here?" />
         </motion.div>
       )}
 
       <AnimatePresence>
-        {step >= 2 && step < 4 && (
+        {step >= 2 && step <= 3 && (
           <motion.div className="heard" {...fade} exit={{ opacity: 0, y: -6 }} key="h1">
             Heard: "Why do you want to work here?"
             <span className="heard-actions"><b>Use</b> · Edit · <b>Combine</b></span>
@@ -174,8 +162,7 @@ function SlidePro({ reduce }: { reduce: boolean }) {
         <motion.div className="bubble ai" {...fade}>
           <Typewriter
             run={step === 5}
-            reduce={reduce}
-            text="Your mission to make hiring fairer maps to my last role… and in three years I want to be leading that work here."
+            text="Your mission to make hiring fairer maps to my last role — and in three years I want to be leading that work here."
           />
         </motion.div>
       )}
@@ -187,17 +174,24 @@ const SLIDES = [
   { label: 'Practice', Comp: SlideChat },
   { label: 'Pro · live', Comp: SlidePro },
 ]
+const DWELL = [9500, 12500] // ms per slide — long enough for each sequence to finish
 
 export function HeroShowcase() {
-  const reduce = useReducedMotion() ?? false
   const [index, setIndex] = useState(0)
+  const [cycle, setCycle] = useState(0)
   const [paused, setPaused] = useState(false)
 
+  function go(to: number) {
+    setIndex(((to % SLIDES.length) + SLIDES.length) % SLIDES.length)
+    setCycle((c) => c + 1)
+  }
+
+  // Auto-rotate: re-arm a timer on every slide change; pause on hover.
   useEffect(() => {
-    if (reduce || paused) return
-    const id = setInterval(() => setIndex((i) => (i + 1) % SLIDES.length), 8500)
-    return () => clearInterval(id)
-  }, [reduce, paused])
+    if (paused) return
+    const t = setTimeout(() => go(index + 1), DWELL[index])
+    return () => clearTimeout(t)
+  }, [index, cycle, paused])
 
   const { label, Comp } = SLIDES[index]
 
@@ -224,29 +218,25 @@ export function HeroShowcase() {
           <div className="main">
             <AnimatePresence mode="wait">
               <motion.div
-                key={index}
+                key={`${index}-${cycle}`}
                 initial={{ opacity: 0, x: 24 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -24 }}
                 transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                 style={{ height: '100%' }}
               >
-                <Comp reduce={reduce} />
+                <Comp />
               </motion.div>
             </AnimatePresence>
           </div>
         </div>
 
-        {!reduce && (
-          <>
-            <button className="car-arrow left" aria-label="Previous" onClick={() => setIndex((i) => (i + SLIDES.length - 1) % SLIDES.length)}>
-              {I.chevL}
-            </button>
-            <button className="car-arrow right" aria-label="Next" onClick={() => setIndex((i) => (i + 1) % SLIDES.length)}>
-              {I.chevR}
-            </button>
-          </>
-        )}
+        <button className="car-arrow left" aria-label="Previous slide" onClick={() => go(index - 1)}>
+          {I.chevL}
+        </button>
+        <button className="car-arrow right" aria-label="Next slide" onClick={() => go(index + 1)}>
+          {I.chevR}
+        </button>
       </motion.div>
 
       <div className="dots">
@@ -255,7 +245,7 @@ export function HeroShowcase() {
             key={s.label}
             className={`dot${i === index ? ' active' : ''}`}
             aria-label={s.label}
-            onClick={() => setIndex(i)}
+            onClick={() => go(i)}
           />
         ))}
       </div>
