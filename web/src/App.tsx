@@ -9,9 +9,10 @@ import { Reveal, Stagger, Item, Counter } from './reveal'
 // shows install/SmartScreen steps). The actual installer asset URL/version lives
 // in web/public/download.html — edit it there per release.
 const DOWNLOAD_PAGE = '/download.html'
-// Lemon Squeezy buy-link isn't set up yet → "Get Pro" routes to the download CTA
-// (Pro is unlocked in-app via Account → Upgrade). Swap in the LS URL later.
-const PRO_CHECKOUT_URL = '#download'
+// Lemon Squeezy buy-link for Aplomb Pro. Site "Get Pro" opens it in a new tab
+// (a marketing entry — per-user linking happens in-app via Account → Upgrade,
+// which appends checkout[custom][user_id] so the webhook ties it to the account).
+const PRO_CHECKOUT_URL = 'https://aplomb.lemonsqueezy.com/checkout/buy/1de6f617-107a-4a48-aebd-0d6e1bf2d213'
 const PRO_PRICE = '$9' // monthly
 const CONTACT_EMAIL = 'hello@aplomb.app'
 
@@ -392,7 +393,7 @@ export default function App() {
                 <li>{ico.check} Focus mode</li>
                 <li>{ico.check} Priority updates</li>
               </ul>
-              <motion.a className="btn btn-primary" href={PRO_CHECKOUT_URL} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+              <motion.a className="btn btn-primary" href={PRO_CHECKOUT_URL} target="_blank" rel="noopener noreferrer" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
                 Get Pro {ico.arrow}
               </motion.a>
             </Item>
