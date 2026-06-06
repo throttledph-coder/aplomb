@@ -1,14 +1,8 @@
 import { useEffect, useState, type JSX, type ReactNode } from 'react'
-import {
-  motion,
-  AnimatePresence,
-  useMotionValue,
-  useSpring,
-  useTransform,
-  useReducedMotion,
-} from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { SmokeBackground } from './SmokeBackground'
 import { AplombMark } from './Logo'
+import { HeroShowcase } from './HeroShowcase'
 import { Reveal, Stagger, Item, Counter } from './reveal'
 
 // Download routes through the styled /download.html page (auto-starts the file +
@@ -100,7 +94,7 @@ const FEATURES: Feature[] = [
   { icon: ico.doc, title: 'Tailored practice answers', body: 'Upload your resume + the job description and get strong, personal answers to likely questions — grounded only in your real experience.' },
   { icon: ico.target, title: 'Coaching feedback', body: 'Each session ends with a report: what landed, keyword coverage vs. the role, and concrete ways to tighten your delivery.' },
   { icon: ico.kanban, title: 'Application tracker', body: 'Track every role — wishlist, applied, interviewing, offer — with notes, AI resume↔JD gap analysis, and cover-letter drafts.' },
-  { icon: ico.mic, title: 'Live practice assistant', pro: true, body: 'Listens to the question audio and surfaces suggested talking points in real time — in mock practice or a live call.' },
+  { icon: ico.mic, title: 'Auto-listen + live answers', pro: true, body: "Aplomb transcribes the interviewer's questions in real time (Groq Whisper), shows them as cards you can Use, Edit, or Combine, and drafts your answer hands-free — in mock practice or a live call." },
   { icon: ico.lock, title: 'Private by design', body: 'Bring your own API key or run fully local with Ollama — your resume and answers stay on your machine, encrypted.' },
   { icon: ico.shield, title: 'Stealth mode', pro: true, body: 'Turn it on and the Aplomb window is hidden from screen sharing and recording (Zoom, Meet, Teams) and drops off the taskbar — your notes stay private to you, always on top while you talk.' },
 ]
@@ -115,6 +109,7 @@ const STATS: { value: ReactNode; label: string }[] = [
 const COMPARE: { label: string; aplomb: boolean; generic: boolean }[] = [
   { label: 'Private — your own key or fully local', aplomb: true, generic: false },
   { label: 'Stays private on calls — hidden from screen share & recording', aplomb: true, generic: false },
+  { label: 'Real-time transcription of the interviewer (Whisper)', aplomb: true, generic: false },
   { label: 'Answers grounded only in your real resume + the JD', aplomb: true, generic: false },
   { label: 'Coaching report after every session', aplomb: true, generic: false },
   { label: 'Application tracker + cover-letter drafts', aplomb: true, generic: false },
@@ -131,7 +126,7 @@ const FAQ = [
   { q: 'Is my data private?', a: 'Yes. Everything runs on your computer. You use your own AI key (Groq free tier) or run locally with Ollama — your resume and answers are never stored on our servers, and your key is encrypted on-device.' },
   { q: 'What platforms are supported?', a: 'Windows today. Mac and Linux are planned.' },
   { q: 'Is the window hidden during screen sharing?', a: 'With Stealth mode on (Windows), Aplomb uses OS screen-capture protection so its window is excluded from screen sharing and recording in apps like Zoom, Meet, and Teams, while staying visible to you. It is a privacy feature for your own setup, not a guarantee against every possible capture method.' },
-  { q: 'What do I get with Pro?', a: 'The live practice assistant (real-time suggested talking points) and stealth mode. All preparation features — resume tailoring, practice answers, reports, and the tracker — are free and unlimited.' },
+  { q: 'What do I get with Pro?', a: "Live auto-listen — Aplomb transcribes the interviewer's questions in real time (Groq Whisper), lets you Use/Edit/Combine them, and drafts answers hands-free — plus stealth mode (hidden from screen share) and tray mode. All preparation features — resume tailoring, practice answers, reports, and the tracker — are free and unlimited." },
   { q: 'How does billing work?', a: 'Pro is a monthly subscription handled by our payment provider (Lemon Squeezy), who manages taxes and receipts. Cancel anytime.' },
 ]
 
@@ -156,71 +151,7 @@ function useActiveSection(ids: string[]): string {
   return active
 }
 
-/* ---------- interactive (tilt) app mockup ---------- */
-function Mockup() {
-  const reduce = useReducedMotion()
-  const mvX = useMotionValue(0)
-  const mvY = useMotionValue(0)
-  const rotateX = useSpring(useTransform(mvY, [-0.5, 0.5], [7, -7]), { stiffness: 150, damping: 18 })
-  const rotateY = useSpring(useTransform(mvX, [-0.5, 0.5], [-9, 9]), { stiffness: 150, damping: 18 })
-
-  function onMove(e: React.MouseEvent<HTMLDivElement>) {
-    if (reduce) return
-    const r = e.currentTarget.getBoundingClientRect()
-    mvX.set((e.clientX - r.left) / r.width - 0.5)
-    mvY.set((e.clientY - r.top) / r.height - 0.5)
-  }
-  function onLeave() {
-    mvX.set(0)
-    mvY.set(0)
-  }
-
-  const inner = (
-    <div className="mock">
-      <div className="bar">
-        <i /><i /><i />
-      </div>
-      <div className="body">
-        <div className="rail">
-          <div className="logo"><AplombMark size={15} className="dia" /> Aplomb</div>
-          <div className="navi active" />
-          <div className="navi" />
-          <div className="navi" />
-          <div className="navi" />
-        </div>
-        <div className="main">
-          <div className="bubble me">Tell me about a time you handled a tough customer.</div>
-          <div className="bubble ai">
-            I owned a billing escalation end-to-end: I acknowledged the error, walked the customer
-            through the refund, looped in finance, and followed up the next day. They stayed — and
-            later upgraded.
-          </div>
-          <div className="bubble me">What's your greatest strength?</div>
-          <div className="composer">
-            Ask a question…
-            <span className="send">{ico.arrow}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-
-  if (reduce) return <div className="mock-wrap">{inner}</div>
-
-  return (
-    <motion.div
-      className="mock-wrap"
-      onMouseMove={onMove}
-      onMouseLeave={onLeave}
-      style={{ rotateX, rotateY, transformPerspective: 1100 }}
-      initial={{ opacity: 0, y: 40 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-    >
-      {inner}
-    </motion.div>
-  )
-}
+/* Hero app showcase (animated chat + Pro demo carousel) lives in HeroShowcase.tsx */
 
 /* ---------- FAQ accordion ---------- */
 function Faq() {
@@ -315,7 +246,7 @@ export default function App() {
               <span className="pill">{ico.shield} Stealth — hidden from screen share</span>
             </div>
           </Reveal>
-          <Mockup />
+          <HeroShowcase />
         </div>
       </div>
 
