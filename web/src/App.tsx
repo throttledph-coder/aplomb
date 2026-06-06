@@ -1,22 +1,14 @@
 import { useEffect, useState, type JSX, type ReactNode } from 'react'
-import {
-  motion,
-  AnimatePresence,
-  useMotionValue,
-  useSpring,
-  useTransform,
-  useReducedMotion,
-} from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { SmokeBackground } from './SmokeBackground'
 import { AplombMark } from './Logo'
+import { HeroShowcase } from './HeroShowcase'
 import { Reveal, Stagger, Item, Counter } from './reveal'
 
-// EDIT ME — direct download link to the published installer asset. Three parts:
-//   owner/repo (throttledph/aplomb) · release tag (v0.13.0) · asset filename.
-// The link goes live once that GitHub release is published with this .exe attached;
-// fix this one line if your owner/repo or tag differs.
-const DOWNLOAD_URL =
-  'https://github.com/throttledph/aplomb/releases/download/v0.13.3/Aplomb-Windows-0.13.3-Setup.exe'
+// Download routes through the styled /download.html page (auto-starts the file +
+// shows install/SmartScreen steps). The actual installer asset URL/version lives
+// in web/public/download.html — edit it there per release.
+const DOWNLOAD_PAGE = '/download.html'
 // Lemon Squeezy buy-link isn't set up yet → "Get Pro" routes to the download CTA
 // (Pro is unlocked in-app via Account → Upgrade). Swap in the LS URL later.
 const PRO_CHECKOUT_URL = '#download'
@@ -102,7 +94,7 @@ const FEATURES: Feature[] = [
   { icon: ico.doc, title: 'Tailored practice answers', body: 'Upload your resume + the job description and get strong, personal answers to likely questions — grounded only in your real experience.' },
   { icon: ico.target, title: 'Coaching feedback', body: 'Each session ends with a report: what landed, keyword coverage vs. the role, and concrete ways to tighten your delivery.' },
   { icon: ico.kanban, title: 'Application tracker', body: 'Track every role — wishlist, applied, interviewing, offer — with notes, AI resume↔JD gap analysis, and cover-letter drafts.' },
-  { icon: ico.mic, title: 'Live practice assistant', pro: true, body: 'Listens to the question audio and surfaces suggested talking points in real time — in mock practice or a live call.' },
+  { icon: ico.mic, title: 'Auto-listen + live answers', pro: true, body: "Aplomb transcribes the interviewer's questions in real time (Groq Whisper), shows them as cards you can Use, Edit, or Combine, and drafts your answer hands-free — in mock practice or a live call." },
   { icon: ico.lock, title: 'Private by design', body: 'Bring your own API key or run fully local with Ollama — your resume and answers stay on your machine, encrypted.' },
   { icon: ico.shield, title: 'Stealth mode', pro: true, body: 'Turn it on and the Aplomb window is hidden from screen sharing and recording (Zoom, Meet, Teams) and drops off the taskbar — your notes stay private to you, always on top while you talk.' },
 ]
@@ -117,6 +109,7 @@ const STATS: { value: ReactNode; label: string }[] = [
 const COMPARE: { label: string; aplomb: boolean; generic: boolean }[] = [
   { label: 'Private — your own key or fully local', aplomb: true, generic: false },
   { label: 'Stays private on calls — hidden from screen share & recording', aplomb: true, generic: false },
+  { label: 'Real-time transcription of the interviewer (Whisper)', aplomb: true, generic: false },
   { label: 'Answers grounded only in your real resume + the JD', aplomb: true, generic: false },
   { label: 'Coaching report after every session', aplomb: true, generic: false },
   { label: 'Application tracker + cover-letter drafts', aplomb: true, generic: false },
@@ -133,7 +126,7 @@ const FAQ = [
   { q: 'Is my data private?', a: 'Yes. Everything runs on your computer. You use your own AI key (Groq free tier) or run locally with Ollama — your resume and answers are never stored on our servers, and your key is encrypted on-device.' },
   { q: 'What platforms are supported?', a: 'Windows today. Mac and Linux are planned.' },
   { q: 'Is the window hidden during screen sharing?', a: 'With Stealth mode on (Windows), Aplomb uses OS screen-capture protection so its window is excluded from screen sharing and recording in apps like Zoom, Meet, and Teams, while staying visible to you. It is a privacy feature for your own setup, not a guarantee against every possible capture method.' },
-  { q: 'What do I get with Pro?', a: 'The live practice assistant (real-time suggested talking points) and stealth mode. All preparation features — resume tailoring, practice answers, reports, and the tracker — are free and unlimited.' },
+  { q: 'What do I get with Pro?', a: "Live auto-listen — Aplomb transcribes the interviewer's questions in real time (Groq Whisper), lets you Use/Edit/Combine them, and drafts answers hands-free — plus stealth mode (hidden from screen share) and tray mode. All preparation features — resume tailoring, practice answers, reports, and the tracker — are free and unlimited." },
   { q: 'How does billing work?', a: 'Pro is a monthly subscription handled by our payment provider (Lemon Squeezy), who manages taxes and receipts. Cancel anytime.' },
 ]
 
@@ -158,71 +151,7 @@ function useActiveSection(ids: string[]): string {
   return active
 }
 
-/* ---------- interactive (tilt) app mockup ---------- */
-function Mockup() {
-  const reduce = useReducedMotion()
-  const mvX = useMotionValue(0)
-  const mvY = useMotionValue(0)
-  const rotateX = useSpring(useTransform(mvY, [-0.5, 0.5], [7, -7]), { stiffness: 150, damping: 18 })
-  const rotateY = useSpring(useTransform(mvX, [-0.5, 0.5], [-9, 9]), { stiffness: 150, damping: 18 })
-
-  function onMove(e: React.MouseEvent<HTMLDivElement>) {
-    if (reduce) return
-    const r = e.currentTarget.getBoundingClientRect()
-    mvX.set((e.clientX - r.left) / r.width - 0.5)
-    mvY.set((e.clientY - r.top) / r.height - 0.5)
-  }
-  function onLeave() {
-    mvX.set(0)
-    mvY.set(0)
-  }
-
-  const inner = (
-    <div className="mock">
-      <div className="bar">
-        <i /><i /><i />
-      </div>
-      <div className="body">
-        <div className="rail">
-          <div className="logo"><AplombMark size={15} className="dia" /> Aplomb</div>
-          <div className="navi active" />
-          <div className="navi" />
-          <div className="navi" />
-          <div className="navi" />
-        </div>
-        <div className="main">
-          <div className="bubble me">Tell me about a time you handled a tough customer.</div>
-          <div className="bubble ai">
-            I owned a billing escalation end-to-end: I acknowledged the error, walked the customer
-            through the refund, looped in finance, and followed up the next day. They stayed — and
-            later upgraded.
-          </div>
-          <div className="bubble me">What's your greatest strength?</div>
-          <div className="composer">
-            Ask a question…
-            <span className="send">{ico.arrow}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-
-  if (reduce) return <div className="mock-wrap">{inner}</div>
-
-  return (
-    <motion.div
-      className="mock-wrap"
-      onMouseMove={onMove}
-      onMouseLeave={onLeave}
-      style={{ rotateX, rotateY, transformPerspective: 1100 }}
-      initial={{ opacity: 0, y: 40 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-    >
-      {inner}
-    </motion.div>
-  )
-}
+/* Hero app showcase (animated chat + Pro demo carousel) lives in HeroShowcase.tsx */
 
 /* ---------- FAQ accordion ---------- */
 function Faq() {
@@ -273,7 +202,7 @@ export default function App() {
             <a className={`hide-sm ${cls('stealth')}`} href="#stealth">Stealth</a>
             <a className={`hide-sm ${cls('how')}`} href="#how">How it works</a>
             <a className={cls('pricing')} href="#pricing">Pricing</a>
-            <motion.a className="btn btn-primary btn-sm" href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+            <motion.a className="btn btn-primary btn-sm" href={DOWNLOAD_PAGE} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
               Download
             </motion.a>
           </nav>
@@ -302,7 +231,7 @@ export default function App() {
           </Reveal>
           <Reveal delay={0.18}>
             <div className="cta-row">
-              <motion.a className="btn btn-primary" href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+              <motion.a className="btn btn-primary" href={DOWNLOAD_PAGE} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
                 Download for Windows {ico.arrow}
               </motion.a>
               <motion.a className="btn btn-ghost" href="#pricing" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
@@ -317,7 +246,7 @@ export default function App() {
               <span className="pill">{ico.shield} Stealth — hidden from screen share</span>
             </div>
           </Reveal>
-          <Mockup />
+          <HeroShowcase />
         </div>
       </div>
 
@@ -449,7 +378,7 @@ export default function App() {
                 <li>{ico.check} Application tracker + cover letters</li>
                 <li>{ico.check} Bring your own key or local Ollama</li>
               </ul>
-              <motion.a className="btn btn-ghost" href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+              <motion.a className="btn btn-ghost" href={DOWNLOAD_PAGE} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
                 Download free
               </motion.a>
             </Item>
@@ -489,7 +418,7 @@ export default function App() {
           <Reveal>
             <h2>Prepare like you mean it.</h2>
             <p>Free to download. Your data stays yours.</p>
-            <motion.a className="btn btn-primary" href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+            <motion.a className="btn btn-primary" href={DOWNLOAD_PAGE} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
               Download for Windows {ico.arrow}
             </motion.a>
           </Reveal>
