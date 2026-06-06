@@ -11,12 +11,10 @@ import { SmokeBackground } from './SmokeBackground'
 import { AplombMark } from './Logo'
 import { Reveal, Stagger, Item, Counter } from './reveal'
 
-// EDIT ME — direct download link to the published installer asset. Three parts:
-//   owner/repo (throttledph/aplomb) · release tag (v0.13.0) · asset filename.
-// The link goes live once that GitHub release is published with this .exe attached;
-// fix this one line if your owner/repo or tag differs.
-const DOWNLOAD_URL =
-  'https://github.com/throttledph-coder/aplomb/releases/download/v0.13.3/Aplomb-Windows-0.13.3-Setup.exe'
+// Download routes through the styled /download.html page (auto-starts the file +
+// shows install/SmartScreen steps). The actual installer asset URL/version lives
+// in web/public/download.html — edit it there per release.
+const DOWNLOAD_PAGE = '/download.html'
 // Lemon Squeezy buy-link isn't set up yet → "Get Pro" routes to the download CTA
 // (Pro is unlocked in-app via Account → Upgrade). Swap in the LS URL later.
 const PRO_CHECKOUT_URL = '#download'
@@ -273,7 +271,7 @@ export default function App() {
             <a className={`hide-sm ${cls('stealth')}`} href="#stealth">Stealth</a>
             <a className={`hide-sm ${cls('how')}`} href="#how">How it works</a>
             <a className={cls('pricing')} href="#pricing">Pricing</a>
-            <motion.a className="btn btn-primary btn-sm" href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+            <motion.a className="btn btn-primary btn-sm" href={DOWNLOAD_PAGE} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
               Download
             </motion.a>
           </nav>
@@ -302,7 +300,7 @@ export default function App() {
           </Reveal>
           <Reveal delay={0.18}>
             <div className="cta-row">
-              <motion.a className="btn btn-primary" href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+              <motion.a className="btn btn-primary" href={DOWNLOAD_PAGE} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
                 Download for Windows {ico.arrow}
               </motion.a>
               <motion.a className="btn btn-ghost" href="#pricing" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
@@ -449,7 +447,7 @@ export default function App() {
                 <li>{ico.check} Application tracker + cover letters</li>
                 <li>{ico.check} Bring your own key or local Ollama</li>
               </ul>
-              <motion.a className="btn btn-ghost" href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+              <motion.a className="btn btn-ghost" href={DOWNLOAD_PAGE} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
                 Download free
               </motion.a>
             </Item>
@@ -489,7 +487,7 @@ export default function App() {
           <Reveal>
             <h2>Prepare like you mean it.</h2>
             <p>Free to download. Your data stays yours.</p>
-            <motion.a className="btn btn-primary" href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+            <motion.a className="btn btn-primary" href={DOWNLOAD_PAGE} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
               Download for Windows {ico.arrow}
             </motion.a>
           </Reveal>
