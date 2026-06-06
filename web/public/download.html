@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <meta name="theme-color" content="#1a1a18" />
     <title>Downloading Aplomb — Windows</title>
     <meta name="robots" content="noindex" />
     <!-- EDIT ME each release: the installer asset URL (owner/repo · tag · filename) -->
@@ -31,6 +34,14 @@
       }
       @keyframes spin { to { transform: rotate(360deg); } }
       @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+      /* "started" state: hide spinner, show a coral check badge */
+      .check {
+        display: none; width: 44px; height: 44px; margin: 6px auto 22px;
+        border-radius: 50%; background: hsl(15 63% 55% / 0.14);
+        color: var(--primary); align-items: center; justify-content: center;
+      }
+      body.done .spinner { display: none; }
+      body.done .check { display: flex; }
       h1 { font-size: clamp(24px, 5vw, 32px); letter-spacing: -0.02em; margin: 0 0 8px; }
       .meta { color: var(--muted); font-size: 14px; margin: 0 0 24px; }
       .btn {
@@ -67,8 +78,11 @@
 
     <main>
       <div class="spinner"></div>
-      <h1>Your download is starting…</h1>
-      <p class="meta">Aplomb for Windows · v0.13.3 · ~100 MB</p>
+      <div class="check" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </div>
+      <h1 id="title">Your download is starting…</h1>
+      <p class="meta" id="meta">Aplomb for Windows · v0.13.3 · ~100 MB</p>
 
       <a id="dl" class="btn" href="https://github.com/throttledph-coder/aplomb/releases/download/v0.13.3/Aplomb-Windows-0.13.3-Setup.exe" download>Download Aplomb</a>
       <p class="fallback">If it doesn't start, click the button above.</p>
@@ -96,11 +110,19 @@
     <footer>← <a href="/">Back to aplomb</a></footer>
 
     <script>
-      // Auto-start the download shortly after the page paints.
+      // Auto-start the download shortly after the page paints, then flip the UI
+      // to a "started" state so the spinner doesn't appear to hang forever.
       setTimeout(function () {
         var a = document.getElementById('dl')
         if (a) a.click()
       }, 600)
+      setTimeout(function () {
+        document.body.classList.add('done')
+        var t = document.getElementById('title')
+        var m = document.getElementById('meta')
+        if (t) t.textContent = 'Your download has started'
+        if (m) m.textContent = "If nothing happened, use the button below — Aplomb for Windows · v0.13.3 · ~100 MB."
+      }, 1500)
     </script>
   </body>
 </html>
