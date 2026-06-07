@@ -42,6 +42,8 @@ interface AppState {
   subscription: SubscriptionInfo | null
   profile: ProfileInfo | null
   authReady: boolean
+  zenMode: boolean // live-session reading mode: hide sidebar, full-bleed (transient)
+  setZenMode: (v: boolean) => void
   loadProfile: () => Promise<void>
   updateProfile: (patch: Partial<ProfileInfo>) => Promise<{ ok: boolean; error?: string }>
   loadSettings: () => Promise<void>
@@ -86,6 +88,8 @@ export const useAppStore = create<AppState>((set, get) => {
   return {
     settings: {},
     plan: 'free',
+    zenMode: false,
+    setZenMode: (v: boolean) => set({ zenMode: v }),
     isOnboarded: false,
     loaded: false,
     activeSession: null,

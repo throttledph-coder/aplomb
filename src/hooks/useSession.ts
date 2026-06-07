@@ -73,7 +73,11 @@ export function useSession(sessionId: number) {
   }, [session])
 
   const runAnswer = useCallback(
-    async (question: string, previous: QAPair[]): Promise<string | null> => {
+    async (
+      question: string,
+      previous: QAPair[],
+      lengthOverride?: AnswerLength,
+    ): Promise<string | null> => {
       if (!session || !resume || !window.ai) return null
       setIsGenerating(true)
       setCurrentAnswer('')
@@ -84,7 +88,7 @@ export function useSession(sessionId: number) {
             resume,
             session,
             previousQA: previous.map((qa) => ({ q: qa.question, a: qa.answer })),
-            answerLength: resolveLength(answerLengthSetting),
+            answerLength: lengthOverride ?? resolveLength(answerLengthSetting),
             candidate: profile
               ? {
                   preferredName: profile.preferred_name ?? undefined,
@@ -114,14 +118,14 @@ export function useSession(sessionId: number) {
   )
 
   const askQuestion = useCallback(
-    async (question: string) => {
+    async (question: string, opts?: { length?: AnswerLength }) => {
       const text = question.trim()
       if (!text || isGenerating || !session) return
       setCurrentQuestion(text)
       lastQuestionRef.current = text
 
       const started = Date.now()
-      const answer = await runAnswer(text, qaHistory)
+      const answer = await runAnswer(text, qaHistory, opts?.length)
       if (answer === null) return
 
       const sequence_order = await window.db.qa.nextSequence(sessionId)

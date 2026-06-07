@@ -12,6 +12,7 @@ export class AudioRecorder {
   private analyser: AnalyserNode | null = null
   private data: Uint8Array<ArrayBuffer> | null = null
   private clipActive = false
+  private vadPoll: ReturnType<typeof setInterval> | null = null
 
   // Open an audio stream. system=true captures system/loopback audio (the
   // interviewer's voice) via getDisplayMedia; otherwise the local microphone.
@@ -74,6 +75,67 @@ export class AudioRecorder {
     recordOne()
   }
 
+  /**
+   * Voice-activity segmented clips: starts a fresh recorder when speech begins
+   * and stops it on a sustained pause (or a hard cap), so each emitted Blob is
+   * one COMPLETE utterance — questions aren't split across fixed windows. Each
+   * segment is its own headered webm (decodable by Whisper). Runs until stop().
+   */
+  async startVadClips(onClip: (clip: Blob) => void, system = false): Promise<void> {
+    await this.openAudio(system)
+    this.clipActive = true
+
+    const START = 0.02 // speech-onset level threshold (matches the silent-detector)
+    const SILENCE_MS = 900 // pause that ends an utterance
+    const MIN_MS = 1200 // ignore ultra-short blips
+    const MAX_MS = 14000 // hard cap so a long monologue still flushes
+    const POLL = 100
+
+    let rec: MediaRecorder | null = null
+    let parts: Blob[] = []
+    let segStart = 0
+    let lastLoud = 0
+
+    const beginSeg = () => {
+      if (!this.stream) return
+      parts = []
+      const r = new MediaRecorder(this.stream)
+      r.ondataavailable = (e) => {
+        if (e.data.size > 0) parts.push(e.data)
+      }
+      r.onstop = () => {
+        if (parts.length > 0) onClip(new Blob(parts, { type: r.mimeType || 'audio/webm' }))
+        if (rec === r) rec = null
+      }
+      rec = r
+      this.recorder = r
+      segStart = Date.now()
+      lastLoud = Date.now()
+      r.start()
+    }
+
+    const endSeg = () => {
+      if (rec && rec.state === 'recording') rec.stop() // onstop → onClip
+    }
+
+    this.vadPoll = setInterval(() => {
+      if (!this.clipActive || !this.stream) return
+      const lvl = this.getAudioLevel()
+      const now = Date.now()
+      if (!rec) {
+        if (lvl > START) beginSeg()
+        return
+      }
+      if (lvl > START) lastLoud = now
+      const dur = now - segStart
+      if (dur >= MAX_MS) {
+        endSeg() // cap reached; next poll re-opens a segment if still talking
+        return
+      }
+      if (dur >= MIN_MS && now - lastLoud >= SILENCE_MS) endSeg()
+    }, POLL)
+  }
+
   /** Current input level, 0..1 (RMS of the frequency data). */
   getAudioLevel(): number {
     if (!this.analyser || !this.data) return 0
@@ -108,6 +170,10 @@ export class AudioRecorder {
 
   stop(): void {
     this.clipActive = false
+    if (this.vadPoll !== null) {
+      clearInterval(this.vadPoll)
+      this.vadPoll = null
+    }
     if (this.recorder?.state === 'recording') this.recorder.stop()
     this.stream?.getTracks().forEach((t) => t.stop())
     void this.audioCtx?.close()

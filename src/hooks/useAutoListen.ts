@@ -3,27 +3,52 @@ import { toast } from 'sonner'
 import { AudioRecorder } from '@/lib/audio/recorder'
 import { detectQuestion } from '@/lib/audio/question-filter'
 
-const CLIP_MS = 5000
 const MAX_PENDING = 6
+const FLUSH_MS = 3500 // quiet window after the last detected question before auto-answering
+const RETRY_MS = 700 // re-check interval while a previous answer is still streaming
 
 export interface PendingQuestion {
   id: string
   text: string
 }
 
+// Join all currently-pending detected questions into one prompt (trim + drop blanks).
+export function combineQuestionTexts(items: { text: string }[]): string {
+  return items
+    .map((i) => i.text.trim())
+    .filter(Boolean)
+    .join(' ')
+}
+
 export interface UseAutoListenOptions {
   onQuestion: (text: string) => void
+  // When true, detected questions auto-combine after a quiet window and answer
+  // hands-free (no Use/Combine clicks). Experimental.
+  autoAnswer?: boolean
+  // True while an answer is currently streaming — auto-flush waits for it.
+  isBusy?: boolean
 }
 
 // Auto-listen via system audio → Groq Whisper (Web Speech isn't available in
 // Electron). Detected questions accumulate as a manual pending queue — the user
 // decides to use/edit/ignore/combine each one (no auto-confirm).
-export function useAutoListen({ onQuestion }: UseAutoListenOptions) {
+export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }: UseAutoListenOptions) {
   const recorderRef = useRef<AudioRecorder | null>(null)
   const levelTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const erroredRef = useRef(false)
   const heardRef = useRef(false)
   const startedAtRef = useRef(0)
+
+  // Latest-value refs so the auto-flush timer never runs on stale closures.
+  const onQuestionRef = useRef(onQuestion)
+  const autoAnswerRef = useRef(autoAnswer)
+  const isBusyRef = useRef(isBusy)
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    onQuestionRef.current = onQuestion
+    autoAnswerRef.current = autoAnswer
+    isBusyRef.current = isBusy
+  }, [onQuestion, autoAnswer, isBusy])
 
   const [isListening, setIsListening] = useState(false)
   const [pending, setPending] = useState<PendingQuestion[]>([])
@@ -34,14 +59,52 @@ export function useAutoListen({ onQuestion }: UseAutoListenOptions) {
   // the user shared a screen/window WITHOUT ticking "share audio".
   const [silent, setSilent] = useState(false)
 
-  const addPending = useCallback((text: string) => {
+  // ---- auto-answer flush (debounced, busy-aware) ----
+  const clearFlush = useCallback(() => {
+    if (flushTimer.current) {
+      clearTimeout(flushTimer.current)
+      flushTimer.current = null
+    }
+  }, [])
+
+  const attemptFlush = useCallback(() => {
+    flushTimer.current = null
+    if (!autoAnswerRef.current) return
+    // A previous answer is still streaming — try again shortly.
+    if (isBusyRef.current) {
+      flushTimer.current = setTimeout(attemptFlush, RETRY_MS)
+      return
+    }
     setPending((prev) => {
-      const last = prev[prev.length - 1]
-      if (last && last.text.trim().toLowerCase() === text.trim().toLowerCase()) return prev
-      const next = [...prev, { id: crypto.randomUUID(), text }]
-      return next.length > MAX_PENDING ? next.slice(next.length - MAX_PENDING) : next
+      if (prev.length === 0) return prev
+      const combined = combineQuestionTexts(prev)
+      if (combined) onQuestionRef.current(combined)
+      return []
     })
   }, [])
+
+  const armFlush = useCallback(
+    (ms: number) => {
+      if (flushTimer.current) clearTimeout(flushTimer.current)
+      flushTimer.current = setTimeout(attemptFlush, ms)
+    },
+    [attemptFlush],
+  )
+
+  const addPending = useCallback(
+    (text: string) => {
+      setPending((prev) => {
+        const last = prev[prev.length - 1]
+        if (last && last.text.trim().toLowerCase() === text.trim().toLowerCase()) return prev
+        const next = [...prev, { id: crypto.randomUUID(), text }]
+        return next.length > MAX_PENDING ? next.slice(next.length - MAX_PENDING) : next
+      })
+      // Re-arm the quiet window on every new detected question so a multi-part
+      // question waits for a pause, then answers once.
+      if (autoAnswerRef.current) armFlush(FLUSH_MS)
+    },
+    [armFlush],
+  )
 
   const usePending = useCallback(
     (id: string) => {
@@ -86,13 +149,31 @@ export function useAutoListen({ onQuestion }: UseAutoListenOptions) {
       clearInterval(levelTimer.current)
       levelTimer.current = null
     }
+    clearFlush()
     setIsListening(false)
     setPending([])
     setInterim('')
     setLevel(0)
     setBars([0, 0, 0, 0, 0])
     setSilent(false)
-  }, [])
+  }, [clearFlush])
+
+  // Track pending count without re-triggering the busy effect on every detection.
+  const pendingCountRef = useRef(0)
+  useEffect(() => {
+    pendingCountRef.current = pending.length
+  }, [pending])
+
+  // React to auto-answer toggling + generation finishing: if auto-answer is on,
+  // not busy, and questions are waiting, schedule a near-term flush. Turning
+  // auto-answer off cancels any pending flush.
+  useEffect(() => {
+    if (!autoAnswer) {
+      clearFlush()
+      return
+    }
+    if (!isBusy && pendingCountRef.current > 0) armFlush(RETRY_MS)
+  }, [autoAnswer, isBusy, armFlush, clearFlush])
 
   const startListening = useCallback(async () => {
     if (!window.ai) {
@@ -106,30 +187,27 @@ export function useAutoListen({ onQuestion }: UseAutoListenOptions) {
     const rec = new AudioRecorder()
     try {
       // system=true → capture loopback/system audio (the interviewer), not the mic.
-      await rec.startClips(
-        CLIP_MS,
-        (clip) => {
-          void (async () => {
-            if (erroredRef.current) return
-            try {
-              const bytes = new Uint8Array(await clip.arrayBuffer())
-              const text = (await window.ai.transcribe(bytes)).trim()
-              if (!text) return
-              setInterim(text)
-              const { isQuestion, cleanedText } = detectQuestion(text)
-              if (isQuestion) addPending(cleanedText)
-            } catch (err) {
-              if (!erroredRef.current) {
-                erroredRef.current = true
-                toast.error('Auto-listen needs a Groq API key (Settings → AI Provider).')
-                stopListening()
-              }
-              void err
+      // VAD segments each complete utterance so questions aren't split mid-sentence.
+      await rec.startVadClips((clip) => {
+        void (async () => {
+          if (erroredRef.current) return
+          try {
+            const bytes = new Uint8Array(await clip.arrayBuffer())
+            const text = (await window.ai.transcribe(bytes)).trim()
+            if (!text) return
+            setInterim(text)
+            const { isQuestion, cleanedText } = detectQuestion(text)
+            if (isQuestion) addPending(cleanedText)
+          } catch (err) {
+            if (!erroredRef.current) {
+              erroredRef.current = true
+              toast.error('Auto-listen needs a Groq API key (Settings → AI Provider).')
+              stopListening()
             }
-          })()
-        },
-        true,
-      )
+            void err
+          }
+        })()
+      }, true)
     } catch (err) {
       toast.error(`Could not capture system audio: ${(err as Error).message}`)
       return
