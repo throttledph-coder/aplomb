@@ -1,30 +1,44 @@
-# React + TypeScript + Vite
+# Aplomb
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Desktop interview-prep & live assistant.** Turn your resume + a job description into sharp, personal
+practice answers, coaching feedback, and an application tracker — then, on Pro, get live in-interview help:
+auto-listen, real-time transcription, hands-free auto-answer, and stealth mode.
 
-Currently, two official plugins are available:
+Website: <https://aplomb.throttledph.workers.dev> · Download: Windows installer on the
+[Releases](https://github.com/throttledph-coder/aplomb/releases) page.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## What it does
 
-## Expanding the ESLint configuration
+- **Tailored practice answers** — grounded only in your real resume + the JD.
+- **Coaching reports** — what landed, keyword coverage, concrete fixes.
+- **Application tracker** — wishlist → applied → interviewing → offer, with cover-letter drafts.
+- **Pro — live extras:** auto-listen (system audio → Groq Whisper), real-time transcription with
+  Use / Edit / **Combine**, **Auto-answer** (combine detected questions + answer hands-free),
+  **Focus mode**, **Stealth** (excluded from screen share/recording), and tray mode.
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+Free covers all preparation, unlimited. Pro covers the live in-interview features.
 
-- Configure the top-level `parserOptions` property like this:
+## Privacy
 
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-}
+Your resume, answers, and API key stay on your device (SQLite + OS-encrypted storage). You bring your own
+Groq key or run fully local with Ollama. We only store your account email + subscription status.
+
+## Tech
+
+Electron + React 18 + TypeScript, Tailwind + shadcn/ui, Zustand, better-sqlite3, Groq (LLM + Whisper),
+Supabase (auth + subscription records), Lemon Squeezy (billing, Merchant of Record).
+
+## Develop
+
+```bash
+npm install
+npm run dev        # Electron + Vite dev
+npm test           # vitest
+npm run build      # tsc + vite + electron-builder → release/<version>/
 ```
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+The marketing site lives in `web/` (`cd web && npm run dev`).
+
+## License
+
+[MIT](./LICENSE) © 2026 Jonel Bibar

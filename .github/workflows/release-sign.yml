@@ -1,0 +1,60 @@
+# Build the Windows installer in CI and code-sign it via SignPath (free for OSS).
+#
+# Enable this AFTER your SignPath Foundation project is approved. Fill the four
+# SignPath identifiers below and add the SIGNPATH_API_TOKEN repo secret
+# (Settings → Secrets and variables → Actions). Until then it only runs on
+# manual dispatch, so it never fails on its own.
+name: Release (signed)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to attach the signed installer to (e.g. v0.13.6)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-sign:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build # tsc + vite + electron-builder → release/<version>/
+
+      - name: Upload unsigned installer artifact
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: aplomb-setup-unsigned
+          path: release/**/Aplomb-Windows-*-Setup.exe
+          if-no-files-found: error
+
+      # --- SignPath: submit the artifact to be signed by their HSM ---
+      # Docs: https://about.signpath.io/documentation/github-actions
+      - name: Submit signing request to SignPath
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: REPLACE_WITH_SIGNPATH_ORG_ID
+          project-slug: aplomb
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: windows-installer
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: release/signed
+
+      - name: Attach signed installer to the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          files: release/signed/**/Aplomb-Windows-*-Setup.exe
