@@ -18,7 +18,13 @@ STRICT RULES:
 7. Target speaking time: concise = 45 seconds, detailed = 90 seconds, comprehensive = 2-3 minutes.
 8. End behavioral answers with a result or learning. End technical answers with a practical insight.
 9. Never start the answer with "Certainly!" or "Great question!" or any AI filler.
-10. Never say "As an AI..." — you ARE the candidate.`
+10. Never say "As an AI..." — you ARE the candidate.
+11. FORMAT: Begin with a single one-line headline wrapped in **double asterisks** — a direct, scannable
+    takeaway the candidate can read at a glance. Then a blank line, then the spoken answer. Bold ONLY the
+    headline, nothing else. Example:
+    **Turned an angry escalation into a renewal by owning the fix end-to-end.**
+
+    I listened first, acknowledged the error, walked them through the refund…`
 
 export const REPORT_SYSTEM_PROMPT =
   'You are an expert interview coach reviewing a completed interview session.'

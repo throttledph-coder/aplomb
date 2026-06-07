@@ -13,6 +13,10 @@ import {
   Merge,
   Square,
   HelpCircle,
+  Zap,
+  Type,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -32,7 +36,7 @@ import { SessionHeader } from '@/components/session/SessionHeader'
 import { StealthToggle } from '@/components/session/StealthToggle'
 import { AudioBars } from '@/components/session/AudioBars'
 import { ModelPicker } from '@/components/session/ModelPicker'
-import { Markdown } from '@/components/report/Markdown'
+import { Markdown, type MarkdownSize } from '@/components/report/Markdown'
 import { scoreAnswer, FLAG_TIPS } from '@/lib/eval/answer-scorer'
 import type { AnswerLength } from '@/lib/providers/types'
 
@@ -40,22 +44,26 @@ function ChatTurn({
   question,
   answer,
   streaming,
+  size = 'sm',
+  latest = true,
 }: {
   question: string
   answer: string
   streaming?: boolean
+  size?: MarkdownSize
+  latest?: boolean
 }) {
   return (
-    <div className="space-y-2">
+    <div className={cn('space-y-2 transition-opacity', !latest && 'opacity-60')}>
       <div className="flex justify-end">
         <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-primary px-3.5 py-2 text-sm text-primary-foreground">
           {question}
         </div>
       </div>
       <div className="flex justify-start">
-        <div className="max-w-[90%] rounded-2xl rounded-bl-sm border bg-card px-3.5 py-2.5 text-sm">
+        <div className="max-w-[95%] rounded-2xl rounded-bl-sm border bg-card px-4 py-3 leading-relaxed">
           {answer ? (
-            <Markdown text={answer} />
+            <Markdown text={answer} size={size} tone="normal" />
           ) : streaming ? (
             <span className="inline-flex gap-1">
               <span className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground/60" />
@@ -209,6 +217,8 @@ export default function LiveSession() {
   const plan = useAppStore((s) => s.plan)
   const settings = useAppStore((s) => s.settings)
   const updateSetting = useAppStore((s) => s.updateSetting)
+  const zenMode = useAppStore((s) => s.zenMode)
+  const setZenMode = useAppStore((s) => s.setZenMode)
   const canAutoListen = checkFeatureAccess('autoListenEnabled', plan)
   const canStealth = checkFeatureAccess('stealthModeEnabled', plan)
   const [helpOpen, setHelpOpen] = useState(false)
@@ -227,10 +237,36 @@ export default function LiveSession() {
     endSession,
   } = useSession(sessionId)
 
-  const auto = useAutoListen({ onQuestion: (q) => void askQuestion(q) })
+  // Auto-answer is a Pro feature — gate the value too (not just the toggle UI),
+  // so a stale `auto_answer='true'` can never drive it for a free/lapsed user.
+  const autoAnswer = canAutoListen && settings.auto_answer === 'true'
+  const auto = useAutoListen({
+    // Auto-answer keeps answers concise (less to scan live); manual asks use the
+    // user's saved answer length.
+    onQuestion: (q) => void askQuestion(q, autoAnswer ? { length: 'concise' } : undefined),
+    autoAnswer,
+    isBusy: isGenerating,
+  })
   const bottomRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const [composerInput, setComposerInput] = useState('')
+
+  // Auto-answer toggle: persist the flag; turning it on while idle also starts
+  // listening (it's only meaningful with audio coming in).
+  function toggleAutoAnswer() {
+    const next = autoAnswer ? 'false' : 'true'
+    void updateSetting('auto_answer', next)
+    if (next === 'true' && !auto.isListening) toggleListen()
+  }
+
+  // Answer text size for at-a-glance reading during a live interview.
+  const SIZE_ORDER: MarkdownSize[] = ['base', 'lg', 'xl']
+  const answerSize: MarkdownSize = (settings.answer_text_size as MarkdownSize) || 'lg'
+  function cycleAnswerSize() {
+    const i = SIZE_ORDER.indexOf(answerSize)
+    const next = SIZE_ORDER[(i + 1) % SIZE_ORDER.length] ?? 'lg'
+    void updateSetting('answer_text_size', next)
+  }
 
   function editPending(id: string) {
     const text = auto.editPending(id)
@@ -264,6 +300,17 @@ export default function LiveSession() {
       navigate('/')
     }
   }, [loadError, navigate])
+
+  // Zen/reading mode: restore the sidebar when leaving the session; Esc exits.
+  useEffect(() => () => setZenMode(false), [setZenMode])
+  useEffect(() => {
+    if (!zenMode) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setZenMode(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zenMode, setZenMode])
 
   const showingLive = isGenerating || currentAnswer.length > 0
   const last = qaHistory[qaHistory.length - 1]
@@ -304,7 +351,25 @@ export default function LiveSession() {
         session={session}
         elapsedSec={elapsedSec}
         onEnd={() => void endSession()}
-        extra={canStealth ? <StealthToggle /> : undefined}
+        extra={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setZenMode(!zenMode)}
+              title={zenMode ? 'Exit reading mode (Esc)' : 'Reading mode — focus on the answer'}
+              aria-pressed={zenMode}
+            >
+              {zenMode ? (
+                <Minimize2 className="mr-1.5 h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              {zenMode ? 'Exit' : 'Focus'}
+            </Button>
+            {canStealth && <StealthToggle />}
+          </>
+        }
       />
 
       {/* Conversation transcript (only this scrolls) */}
@@ -320,13 +385,35 @@ export default function LiveSession() {
             <Sparkles className="h-6 w-6" />
             Ask a question below — your suggested answer streams in here.
           </div>
+        ) : zenMode ? (
+          // Reading mode: only the latest/streaming answer, extra-large.
+          <div className="space-y-5">
+            {showingLive ? (
+              <ChatTurn question={currentQuestion} answer={currentAnswer} streaming size="xl" latest />
+            ) : last ? (
+              <ChatTurn question={last.question} answer={last.answer} size="xl" latest />
+            ) : null}
+            <div ref={bottomRef} />
+          </div>
         ) : (
           <div className="space-y-5">
-            {qaHistory.map((qa) => (
-              <ChatTurn key={qa.id} question={qa.question} answer={qa.answer} />
+            {qaHistory.map((qa, i) => (
+              <ChatTurn
+                key={qa.id}
+                question={qa.question}
+                answer={qa.answer}
+                size={answerSize}
+                latest={!showingLive && i === qaHistory.length - 1}
+              />
             ))}
             {showingLive && (
-              <ChatTurn question={currentQuestion} answer={currentAnswer} streaming />
+              <ChatTurn
+                question={currentQuestion}
+                answer={currentAnswer}
+                streaming
+                size={answerSize}
+                latest
+              />
             )}
             {!isGenerating && last && (
               <div className="space-y-1 pl-1">
@@ -377,39 +464,72 @@ export default function LiveSession() {
           generating={isGenerating}
           onStop={cancelGeneration}
           leftControls={
-            canAutoListen && (
-              <div className="flex items-center gap-0.5">
-                {/* Tiny borderless mic that morphs into live sound-waves when listening. */}
-                <button
-                  type="button"
-                  title={auto.isListening ? 'Stop listening' : 'Auto-listen (system audio)'}
-                  aria-label={auto.isListening ? 'Stop listening' : 'Auto-listen'}
-                  onClick={toggleListen}
-                  className={cn(
-                    'flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-                    auto.isListening && 'text-primary',
-                  )}
-                >
-                  {auto.isListening ? (
-                    <AudioBars bars={auto.bars} active size="sm" />
-                  ) : (
-                    <Mic className="h-3.5 w-3.5" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  title="How auto-listen works"
-                  aria-label="Auto-listen help"
-                  onClick={() => setHelpOpen(true)}
-                  className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  <HelpCircle className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )
+            <div className="flex items-center gap-0.5">
+              {/* Answer text size — cycle base → lg → xl for at-a-glance reading. */}
+              <button
+                type="button"
+                title={`Answer text size: ${answerSize} (tap to enlarge)`}
+                aria-label="Cycle answer text size"
+                onClick={cycleAnswerSize}
+                className="flex h-6 items-center justify-center gap-0.5 rounded-md px-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <Type className="h-3.5 w-3.5" />
+                <span className="text-[10px] font-semibold uppercase">{answerSize}</span>
+              </button>
+              {canAutoListen && (
+                <>
+                  {/* Tiny borderless mic that morphs into live sound-waves when listening. */}
+                  <button
+                    type="button"
+                    title={auto.isListening ? 'Stop listening' : 'Auto-listen (system audio)'}
+                    aria-label={auto.isListening ? 'Stop listening' : 'Auto-listen'}
+                    onClick={toggleListen}
+                    className={cn(
+                      'flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                      auto.isListening && 'text-primary',
+                    )}
+                  >
+                    {auto.isListening ? (
+                      <AudioBars bars={auto.bars} active size="sm" />
+                    ) : (
+                      <Mic className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    title={
+                      autoAnswer
+                        ? 'Auto-answer on — detected questions are combined and answered automatically'
+                        : 'Auto-answer: combine detected questions and answer automatically'
+                    }
+                    aria-label="Toggle auto-answer"
+                    aria-pressed={autoAnswer}
+                    onClick={toggleAutoAnswer}
+                    className={cn(
+                      'flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                      autoAnswer && 'bg-primary/15 text-primary',
+                    )}
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    title="How auto-listen works"
+                    aria-label="Auto-listen help"
+                    onClick={() => setHelpOpen(true)}
+                    className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <HelpCircle className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
           }
           rightControls={<ModelPicker />}
         />
+        <p className="text-center text-[11px] text-muted-foreground">
+          Aplomb can be wrong — skim before you speak.
+        </p>
       </div>
 
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>

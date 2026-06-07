@@ -17,6 +17,12 @@ export class GroqWhisperTranscriber implements AudioTranscriber {
     const res = await this.client.audio.transcriptions.create({
       file,
       model: WHISPER_MODEL,
+      // Tuned for live interview audio: fix the language (avoids misdetection on
+      // short clips), greedy decode for determinism, and a domain prompt that
+      // nudges Whisper to keep question punctuation ("?") the filter relies on.
+      language: 'en',
+      temperature: 0,
+      prompt: "Transcribe the interviewer's question verbatim, with correct punctuation.",
     })
     return res.text
   }

@@ -58,7 +58,8 @@ CURRENT INTERVIEW QUESTION:
 ANSWER LENGTH: ${LENGTH_INSTRUCTIONS[answerLength]}
 
 Generate the answer the candidate should speak.
-Start directly with the answer — no preamble.
+Start with a one-line bold headline (wrapped in **double asterisks**) — a scannable takeaway — then a blank
+line, then the spoken answer. No other preamble and no other bold text.
 Write naturally, as if speaking. Use "I" statements.
 Only reference what is in the candidate's resume.
 `.trim()
