@@ -42,7 +42,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/app-store'
 import { groupByWhen, relativeWhen } from '@/lib/calendar/grouping'
-import { addMonths, addWeeks, monthLabel, weekRangeLabel } from '@/lib/calendar/grid'
+import { addMonths, addWeeks, eventsForDay, monthLabel, weekRangeLabel } from '@/lib/calendar/grid'
 import { launchInterviewSession } from '@/lib/calendar/launch'
 import { MonthView } from '@/components/calendar/MonthView'
 import { WeekView } from '@/components/calendar/WeekView'
@@ -132,6 +132,7 @@ export default function Calendar() {
   const [draft, setDraft] = useState<DraftState | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [detail, setDetail] = useState<Interview | null>(null)
+  const [dayList, setDayList] = useState<Date | null>(null)
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(() => new Date())
   const [viewDate, setViewDate] = useState<Date>(() => new Date())
@@ -281,6 +282,25 @@ export default function Calendar() {
   async function setStatus(id: number, status: Interview['status']) {
     if (!window.db) return
     await window.db.interview.update(id, { status })
+    await refresh()
+  }
+
+  // Drag-to-reschedule. Month keeps the time-of-day (changes the date); Week uses
+  // the dropped slot's time. Rescheduling re-arms reminders (clear sent flags).
+  async function reschedule(id: number, when: Date, keepTime: boolean) {
+    if (!window.db) return
+    const iv = items.find((x) => x.id === id)
+    if (!iv) return
+    const d = new Date(when)
+    if (keepTime) {
+      const old = new Date(iv.scheduled_at)
+      d.setHours(old.getHours(), old.getMinutes(), 0, 0)
+    }
+    await window.db.interview.update(id, {
+      scheduled_at: toLocalInput(d),
+      notified_day_of: false,
+      notified_before: false,
+    })
     await refresh()
   }
 
@@ -459,6 +479,8 @@ export default function Calendar() {
           now={now}
           onDayClick={(d) => openForDate(d, false)}
           onEventClick={setDetail}
+          onMoreClick={setDayList}
+          onEventDrop={(id, d) => void reschedule(id, d, true)}
         />
       ) : view === 'week' ? (
         <WeekView
@@ -467,6 +489,7 @@ export default function Calendar() {
           now={now}
           onSlotClick={(d) => openForDate(d, true)}
           onEventClick={setDetail}
+          onEventDrop={(id, slot) => void reschedule(id, slot, false)}
         />
       ) : total === 0 ? (
         <Card>
@@ -819,6 +842,64 @@ export default function Calendar() {
                   }}
                 >
                   <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Day events (from "+N more" in Month view) */}
+      <Dialog open={dayList !== null} onOpenChange={(o) => !o && setDayList(null)}>
+        <DialogContent className="sm:max-w-md">
+          {dayList && (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {dayList.toLocaleDateString([], {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-1.5">
+                {eventsForDay(items, dayList).map((iv) => (
+                  <button
+                    key={iv.id}
+                    type="button"
+                    onClick={() => {
+                      setDayList(null)
+                      setDetail(iv)
+                    }}
+                    className="flex w-full items-center justify-between gap-2 rounded-md border p-2 text-left text-sm transition-colors hover:bg-accent/40"
+                  >
+                    <span className="min-w-0 truncate">
+                      <span className="tabular-nums text-primary">
+                        {new Date(iv.scheduled_at).toLocaleTimeString([], {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })}
+                      </span>{' '}
+                      {iv.company} — {iv.job_title}
+                    </span>
+                    <Badge variant="outline" className="shrink-0">
+                      {iv.round_name?.trim() || typeLabel(iv.interview_type)}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const d = dayList
+                    setDayList(null)
+                    openForDate(d, false)
+                  }}
+                >
+                  <Plus className="mr-1.5 h-4 w-4" /> Add to this day
                 </Button>
               </div>
             </>

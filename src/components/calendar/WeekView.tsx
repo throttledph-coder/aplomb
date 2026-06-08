@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { weekDays, eventsForDay, minutesSinceMidnight, sameDay } from '@/lib/calendar/grid'
 import { cn } from '@/lib/utils'
 import { eventTone } from './tone'
@@ -9,6 +10,7 @@ interface WeekViewProps {
   now: Date
   onSlotClick: (slot: Date) => void
   onEventClick: (iv: Interview) => void
+  onEventDrop: (id: number, slot: Date) => void
 }
 
 // Pixels per hour. Matches the `h-12` (48px) hour cells; event top/height are
@@ -16,6 +18,7 @@ interface WeekViewProps {
 // dynamic px). Styling otherwise stays in Tailwind per project rules.
 const HOUR_H = 48
 const HOURS = Array.from({ length: 24 }, (_, h) => h)
+const SNAP_MIN = 15
 
 function hourLabel(h: number): string {
   if (h === 0) return ''
@@ -24,12 +27,37 @@ function hourLabel(h: number): string {
   return `${display} ${ampm}`
 }
 
-export function WeekView({ viewDate, items, now, onSlotClick, onEventClick }: WeekViewProps) {
+export function WeekView({
+  viewDate,
+  items,
+  now,
+  onSlotClick,
+  onEventClick,
+  onEventDrop,
+}: WeekViewProps) {
   const days = weekDays(viewDate)
   const nowTop = now.getHours() * HOUR_H + (now.getMinutes() / 60) * HOUR_H
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Open the week scrolled to ~8 AM (typical working hours), once on mount.
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 8 * HOUR_H
+  }, [])
+
+  function dropToSlot(day: Date, e: React.DragEvent<HTMLDivElement>): Date | null {
+    const id = Number(e.dataTransfer.getData('text/plain'))
+    if (!id) return null
+    const rect = e.currentTarget.getBoundingClientRect()
+    const y = e.clientY - rect.top
+    const rawMin = (y / HOUR_H) * 60
+    const mins = Math.max(0, Math.min(23 * 60 + 45, Math.round(rawMin / SNAP_MIN) * SNAP_MIN))
+    const slot = new Date(day)
+    slot.setHours(0, mins, 0, 0)
+    return slot
+  }
 
   return (
-    <div className="max-h-[70vh] overflow-auto rounded-lg border">
+    <div ref={scrollRef} className="max-h-[70vh] overflow-auto rounded-lg border">
       {/* Header row: blank gutter + 7 day headers */}
       <div className="sticky top-0 z-20 grid grid-cols-[3rem_repeat(7,minmax(0,1fr))] bg-card">
         <div className="border-b border-r" />
@@ -66,7 +94,17 @@ export function WeekView({ viewDate, items, now, onSlotClick, onEventClick }: We
           const dayEvents = eventsForDay(items, day)
           const today = sameDay(day, now)
           return (
-            <div key={day.toISOString()} className="relative border-r">
+            <div
+              key={day.toISOString()}
+              className="relative border-r"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault()
+                const slot = dropToSlot(day, e)
+                const id = Number(e.dataTransfer.getData('text/plain'))
+                if (slot && id) onEventDrop(id, slot)
+              }}
+            >
               {HOURS.map((h) => (
                 <div
                   key={h}
@@ -94,6 +132,11 @@ export function WeekView({ viewDate, items, now, onSlotClick, onEventClick }: We
                     key={iv.id}
                     role="button"
                     tabIndex={0}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', String(iv.id))
+                      e.dataTransfer.effectAllowed = 'move'
+                    }}
                     onClick={() => onEventClick(iv)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -102,7 +145,7 @@ export function WeekView({ viewDate, items, now, onSlotClick, onEventClick }: We
                       }
                     }}
                     className={cn(
-                      'absolute inset-x-0.5 z-10 overflow-hidden rounded px-1 text-[11px] leading-tight',
+                      'absolute inset-x-0.5 z-10 cursor-grab overflow-hidden rounded px-1 text-[11px] leading-tight active:cursor-grabbing',
                       eventTone(iv),
                     )}
                     style={{ top, height }}
