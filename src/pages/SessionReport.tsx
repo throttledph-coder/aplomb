@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Loader2, AlertTriangle, Briefcase } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -104,6 +104,16 @@ export default function SessionReport() {
             {new Date(session.started_at).toLocaleDateString()}
           </p>
         </div>
+        {session.application_id && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto"
+            onClick={() => navigate(`/applications/${session.application_id}`)}
+          >
+            <Briefcase className="mr-2 h-4 w-4" /> Open job
+          </Button>
+        )}
       </div>
 
       {status === 'generating' && (

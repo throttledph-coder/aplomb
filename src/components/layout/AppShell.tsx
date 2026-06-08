@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Sidebar } from './Sidebar'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { useAppStore } from '@/store/app-store'
@@ -13,6 +14,24 @@ export function AppShell() {
   useEffect(() => {
     if (!window.app?.onInterviewNavigate) return
     return window.app.onInterviewNavigate(() => navigate('/calendar'))
+  }, [navigate])
+
+  // Surface app updates globally (the launch auto-check fires before Account mounts).
+  useEffect(() => {
+    if (!window.updater?.onEvent) return
+    return window.updater.onEvent((e) => {
+      if (e.type === 'available') {
+        toast('Update available', {
+          description: `Version ${e.payload?.version ?? ''} — open Account to download.`,
+          action: { label: 'Account', onClick: () => navigate('/account') },
+        })
+      } else if (e.type === 'downloaded') {
+        toast.success('Update ready', {
+          description: 'Restart to install — Account → Updates → Restart & install.',
+          action: { label: 'Account', onClick: () => navigate('/account') },
+        })
+      }
+    })
   }, [navigate])
 
   return (

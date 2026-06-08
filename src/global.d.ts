@@ -93,6 +93,7 @@ export interface ClarityDbApi {
     get(id: number): Promise<InterviewSession | null>
     list(): Promise<InterviewSession[]>
     listByResume(resumeId: number): Promise<InterviewSession[]>
+    listByApplication(applicationId: number): Promise<InterviewSession[]>
     update(id: number, patch: UpdateInterviewSession): Promise<InterviewSession | null>
     end(
       id: number,
@@ -122,6 +123,12 @@ export interface ClarityDbApi {
   }
   application: {
     create(input: NewApplication): Promise<Application>
+    get(id: number): Promise<Application | null>
+    upsertForJob(input: {
+      company: string
+      job_title: string
+      job_description?: string | null
+    }): Promise<Application>
     list(): Promise<Application[]>
     update(id: number, patch: UpdateApplication): Promise<Application | null>
     delete(id: number): Promise<void>
@@ -163,6 +170,19 @@ export interface ClarityAppApi {
   onInterviewNavigate(cb: (id: number) => void): () => void
 }
 
+export interface UpdaterEvent {
+  type: 'checking' | 'available' | 'not-available' | 'progress' | 'downloaded' | 'error'
+  payload?: { version?: string; percent?: number; message?: string }
+}
+
+export interface ClarityUpdaterApi {
+  check(): Promise<void>
+  download(): Promise<void>
+  install(): Promise<void>
+  // Subscribe to updater lifecycle events; returns an unsubscribe fn.
+  onEvent(cb: (e: UpdaterEvent) => void): () => void
+}
+
 declare global {
   // Injected at build time by Vite `define` (see vite.config.ts).
   const __APP_VERSION__: string
@@ -173,5 +193,6 @@ declare global {
     stealth: ClarityStealthApi
     license: ClarityLicenseApi
     app: ClarityAppApi
+    updater: ClarityUpdaterApi
   }
 }

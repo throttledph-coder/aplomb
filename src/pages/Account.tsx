@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { RefreshCw, CreditCard, Loader2, Trash2 } from 'lucide-react'
+import { RefreshCw, CreditCard, Loader2, Trash2, Download, CheckCircle2, RotateCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { buildCheckoutUrl } from '@/lib/billing/config'
 import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { useUpdater } from '@/hooks/useUpdater'
 import {
   Dialog,
   DialogContent,
@@ -38,6 +40,7 @@ export default function Account() {
   const profile = useAppStore((s) => s.profile)
   const refreshSubscription = useAppStore((s) => s.refreshSubscription)
   const updateProfile = useAppStore((s) => s.updateProfile)
+  const updater = useUpdater()
   const deleteAccount = useAppStore((s) => s.deleteAccount)
 
   const [refreshing, setRefreshing] = useState(false)
@@ -230,6 +233,73 @@ export default function Account() {
           <Button variant="outline" onClick={() => void sendReset()} disabled={resetting}>
             {resetting ? 'Sending…' : 'Reset password'}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Updates */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Updates</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Current version</span>
+            <span className="font-medium">Aplomb {__APP_VERSION__}</span>
+          </div>
+
+          {import.meta.env.DEV ? (
+            <p className="text-xs text-muted-foreground">
+              Auto-update runs in the installed app, not in development.
+            </p>
+          ) : (
+            <>
+              {updater.status === 'downloading' && (
+                <div className="space-y-1.5">
+                  <Progress value={updater.percent} />
+                  <p className="text-xs text-muted-foreground">Downloading update… {updater.percent}%</p>
+                </div>
+              )}
+              {updater.status === 'available' && (
+                <p className="text-xs text-muted-foreground">
+                  Version {updater.version} is available.
+                </p>
+              )}
+              {updater.status === 'not-available' && (
+                <p className="text-xs text-muted-foreground">You're on the latest version.</p>
+              )}
+              {updater.status === 'error' && (
+                <p className="text-xs text-destructive">{updater.error}</p>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {updater.status === 'downloaded' ? (
+                  <Button size="sm" onClick={() => void updater.install()}>
+                    <RotateCw className="mr-2 h-4 w-4" /> Restart &amp; install
+                  </Button>
+                ) : updater.status === 'available' ? (
+                  <Button size="sm" onClick={() => void updater.download()}>
+                    <Download className="mr-2 h-4 w-4" /> Download update
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={updater.status === 'checking' || updater.status === 'downloading'}
+                    onClick={() => void updater.check()}
+                  >
+                    {updater.status === 'checking' ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : updater.status === 'not-available' ? (
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                    ) : (
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
+                    Check for updates
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

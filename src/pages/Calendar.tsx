@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { CalendarDays, Plus, Trash2, Pencil, Radio, Check, X, MapPin, Clock } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { CalendarDays, Plus, Trash2, Pencil, Radio, Check, X, MapPin, Clock, FileText, Briefcase } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -59,6 +59,7 @@ interface DraftState {
   scheduled_at: string // datetime-local value (YYYY-MM-DDTHH:mm)
   duration_min: number
   notes: string
+  additional_info: string
   remind_day_of: boolean
   remind_mins_before: number
 }
@@ -94,6 +95,7 @@ function emptyDraft(): DraftState {
     scheduled_at: defaultWhen(),
     duration_min: 45,
     notes: '',
+    additional_info: '',
     remind_day_of: true,
     remind_mins_before: 30,
   }
@@ -101,6 +103,7 @@ function emptyDraft(): DraftState {
 
 export default function Calendar() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [items, setItems] = useState<Interview[]>([])
   const [resumes, setResumes] = useState<Resume[]>([])
   const [apps, setApps] = useState<Application[]>([])
@@ -129,6 +132,17 @@ export default function Calendar() {
     void refresh()
   }, [])
 
+  // Deep link from "Schedule interview" (Application detail) → open the add
+  // dialog prefilled, then clear the router state so it won't reopen on back.
+  useEffect(() => {
+    const ni = (location.state as { newInterview?: Partial<DraftState> } | null)?.newInterview
+    if (ni) {
+      setDraft({ ...emptyDraft(), ...ni })
+      navigate('.', { replace: true, state: null })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Keep countdowns fresh + re-bucket as time passes.
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30_000)
@@ -155,6 +169,7 @@ export default function Calendar() {
       scheduled_at: iv.scheduled_at.slice(0, 16),
       duration_min: iv.duration_min,
       notes: iv.notes ?? '',
+      additional_info: iv.additional_info ?? '',
       remind_day_of: iv.remind_day_of,
       remind_mins_before: iv.remind_mins_before ?? 0,
     })
@@ -199,6 +214,7 @@ export default function Calendar() {
       scheduled_at: draft.scheduled_at,
       duration_min: draft.duration_min,
       notes: draft.notes.trim() || null,
+      additional_info: draft.additional_info.trim() || null,
       remind_day_of: draft.remind_day_of,
       remind_mins_before: draft.remind_mins_before || 0,
     }
@@ -265,6 +281,26 @@ export default function Calendar() {
             {upcoming && (
               <Button size="sm" onClick={() => void launchInterviewSession(iv, navigate)}>
                 <Radio className="mr-1.5 h-4 w-4" /> Start live session
+              </Button>
+            )}
+            {iv.session_id && (
+              <Button
+                size="icon"
+                variant="ghost"
+                title="View report"
+                onClick={() => navigate(`/report/${iv.session_id}`)}
+              >
+                <FileText className="h-4 w-4" />
+              </Button>
+            )}
+            {iv.application_id && (
+              <Button
+                size="icon"
+                variant="ghost"
+                title="Open job"
+                onClick={() => navigate(`/applications/${iv.application_id}`)}
+              >
+                <Briefcase className="h-4 w-4" />
               </Button>
             )}
             {upcoming && (
@@ -497,6 +533,16 @@ export default function Calendar() {
                   rows={2}
                   value={draft.notes}
                   onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Additional info (optional)</Label>
+                <Textarea
+                  rows={2}
+                  placeholder="Personal context carried into the live session (motivations, situation)…"
+                  value={draft.additional_info}
+                  onChange={(e) => setDraft({ ...draft, additional_info: e.target.value })}
                 />
               </div>
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Trash2, Pencil, ExternalLink, Sparkles, FileText, Loader2, Copy, Search, Briefcase } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -23,26 +24,11 @@ import {
 } from '@/components/ui/dialog'
 import { Markdown } from '@/components/report/Markdown'
 import { cn } from '@/lib/utils'
+import {
+  APPLICATION_STATUSES as STATUSES,
+  APPLICATION_STATUS_COLORS as STATUS_COLORS,
+} from '@/lib/applications/status'
 import type { Application, ApplicationStatus, Resume } from '@/types'
-
-const STATUSES: { value: ApplicationStatus; label: string }[] = [
-  { value: 'wishlist', label: 'Wishlist' },
-  { value: 'applied', label: 'Applied' },
-  { value: 'screening', label: 'Screening' },
-  { value: 'interview', label: 'Interview' },
-  { value: 'offer', label: 'Offer' },
-  { value: 'rejected', label: 'Rejected' },
-]
-
-// Pipeline colours for the status badge (works on the dark + light themes).
-const STATUS_COLORS: Record<ApplicationStatus, string> = {
-  wishlist: 'border-transparent bg-muted text-muted-foreground',
-  applied: 'border-blue-500/30 bg-blue-500/15 text-blue-500',
-  screening: 'border-amber-500/30 bg-amber-500/15 text-amber-500',
-  interview: 'border-violet-500/30 bg-violet-500/15 text-violet-500',
-  offer: 'border-emerald-500/30 bg-emerald-500/15 text-emerald-500',
-  rejected: 'border-red-500/30 bg-red-500/15 text-red-500',
-}
 
 interface DraftState {
   id: number | null
@@ -65,6 +51,7 @@ const EMPTY_DRAFT: DraftState = {
 }
 
 export default function Applications() {
+  const navigate = useNavigate()
   const [apps, setApps] = useState<Application[]>([])
   const [resumes, setResumes] = useState<Resume[]>([])
   const [resumeId, setResumeId] = useState<number | null>(null)
@@ -260,7 +247,18 @@ export default function Applications() {
                 {g.items.map((a) => (
                   <Card key={a.id}>
                     <CardContent className="flex items-center justify-between py-3">
-                      <div className="min-w-0">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => navigate(`/applications/${a.id}`)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            navigate(`/applications/${a.id}`)
+                          }
+                        }}
+                        className="min-w-0 cursor-pointer rounded-md p-1 -m-1 transition-colors hover:bg-accent/40"
+                      >
                         <p className="truncate font-medium">
                           {a.company} — {a.job_title}
                         </p>
