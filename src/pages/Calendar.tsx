@@ -1,6 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { CalendarDays, Plus, Trash2, Pencil, Radio, Check, X, MapPin, Clock, FileText, Briefcase } from 'lucide-react'
+import {
+  CalendarDays,
+  Plus,
+  Trash2,
+  Pencil,
+  Radio,
+  Check,
+  X,
+  MapPin,
+  Clock,
+  FileText,
+  Briefcase,
+  ChevronLeft,
+  ChevronRight,
+  CalendarRange,
+  List,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -24,9 +40,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { useAppStore } from '@/store/app-store'
 import { groupByWhen, relativeWhen } from '@/lib/calendar/grouping'
+import { addMonths, addWeeks, monthLabel, weekRangeLabel } from '@/lib/calendar/grid'
 import { launchInterviewSession } from '@/lib/calendar/launch'
+import { MonthView } from '@/components/calendar/MonthView'
+import { WeekView } from '@/components/calendar/WeekView'
 import type { Application, Interview, InterviewType, Resume } from '@/types'
+
+type CalView = 'month' | 'week' | 'agenda'
 
 const TYPES: { value: InterviewType; label: string }[] = [
   { value: 'behavioral', label: 'Behavioral' },
@@ -109,8 +131,24 @@ export default function Calendar() {
   const [apps, setApps] = useState<Application[]>([])
   const [draft, setDraft] = useState<DraftState | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [detail, setDetail] = useState<Interview | null>(null)
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(() => new Date())
+  const [viewDate, setViewDate] = useState<Date>(() => new Date())
+  const updateSetting = useAppStore((s) => s.updateSetting)
+  const [view, setView] = useState<CalView>(() => {
+    const v = useAppStore.getState().settings.calendar_view
+    return v === 'week' || v === 'agenda' ? v : 'month'
+  })
+
+  function changeView(v: CalView) {
+    setView(v)
+    void updateSetting('calendar_view', v)
+  }
+
+  function step(dir: -1 | 1) {
+    setViewDate((d) => (view === 'week' ? addWeeks(d, dir) : addMonths(d, dir)))
+  }
 
   async function refresh() {
     if (!window.db) {
@@ -173,6 +211,13 @@ export default function Calendar() {
       remind_day_of: iv.remind_day_of,
       remind_mins_before: iv.remind_mins_before ?? 0,
     })
+  }
+
+  // Click an empty day (month) or hour slot (week) → open the add dialog dated to it.
+  function openForDate(date: Date, withHour: boolean) {
+    const d = new Date(date)
+    if (!withHour) d.setHours(10, 0, 0, 0)
+    setDraft({ ...emptyDraft(), scheduled_at: toLocalInput(d) })
   }
 
   function pickApplication(appId: string) {
@@ -353,19 +398,76 @@ export default function Calendar() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Calendar</h1>
-        <Button onClick={openNew}>
-          <Plus className="mr-2 h-4 w-4" /> Schedule interview
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-md border p-0.5">
+            {(
+              [
+                ['month', 'Month', CalendarDays],
+                ['week', 'Week', CalendarRange],
+                ['agenda', 'Agenda', List],
+              ] as const
+            ).map(([v, label, Icon]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => changeView(v)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-sm transition-colors',
+                  view === v
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+          <Button onClick={openNew}>
+            <Plus className="mr-2 h-4 w-4" /> Schedule interview
+          </Button>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-[4.5rem]" />
-          ))}
+      {view !== 'agenda' && (
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => setViewDate(new Date())}>
+            Today
+          </Button>
+          <div className="flex items-center">
+            <Button variant="ghost" size="icon" onClick={() => step(-1)} title="Previous">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => step(1)} title="Next">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <span className="text-sm font-medium">
+            {view === 'week' ? weekRangeLabel(viewDate) : monthLabel(viewDate)}
+          </span>
         </div>
+      )}
+
+      {loading ? (
+        <Skeleton className="h-[28rem]" />
+      ) : view === 'month' ? (
+        <MonthView
+          viewDate={viewDate}
+          items={items}
+          now={now}
+          onDayClick={(d) => openForDate(d, false)}
+          onEventClick={setDetail}
+        />
+      ) : view === 'week' ? (
+        <WeekView
+          viewDate={viewDate}
+          items={items}
+          now={now}
+          onSlotClick={(d) => openForDate(d, true)}
+          onEventClick={setDetail}
+        />
       ) : total === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
@@ -605,6 +707,122 @@ export default function Calendar() {
               Remove
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Event detail (clicked from Month/Week) */}
+      <Dialog open={detail !== null} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="sm:max-w-md">
+          {detail && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">
+                    {detail.round_name?.trim() || typeLabel(detail.interview_type)}
+                  </Badge>
+                  <span>
+                    {detail.company} — {detail.job_title}
+                  </span>
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 text-sm">
+                <p className="flex items-center gap-2 font-medium text-primary">
+                  <Clock className="h-4 w-4" />
+                  {relativeWhen(detail.scheduled_at, now)} · {detail.duration_min} min
+                </p>
+                {detail.location && (
+                  <p className="flex items-center gap-2 text-muted-foreground">
+                    <MapPin className="h-4 w-4 shrink-0" />
+                    <span className="break-all">{detail.location}</span>
+                  </p>
+                )}
+                {detail.status !== 'upcoming' && (
+                  <Badge variant="secondary" className="capitalize">
+                    {detail.status}
+                  </Badge>
+                )}
+                {detail.notes && <p className="text-muted-foreground">{detail.notes}</p>}
+              </div>
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
+                {detail.status === 'upcoming' && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const iv = detail
+                      setDetail(null)
+                      void launchInterviewSession(iv, navigate)
+                    }}
+                  >
+                    <Radio className="mr-1.5 h-4 w-4" /> Start live session
+                  </Button>
+                )}
+                {detail.session_id && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate(`/report/${detail.session_id}`)}
+                  >
+                    <FileText className="mr-1.5 h-4 w-4" /> Report
+                  </Button>
+                )}
+                {detail.application_id && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate(`/applications/${detail.application_id}`)}
+                  >
+                    <Briefcase className="mr-1.5 h-4 w-4" /> Job
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const iv = detail
+                    setDetail(null)
+                    openEdit(iv)
+                  }}
+                >
+                  <Pencil className="mr-1.5 h-4 w-4" /> Edit
+                </Button>
+                {detail.status === 'upcoming' && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      void setStatus(detail.id, 'completed')
+                      setDetail(null)
+                    }}
+                  >
+                    <Check className="mr-1.5 h-4 w-4" /> Complete
+                  </Button>
+                )}
+                {detail.status === 'upcoming' && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      void setStatus(detail.id, 'cancelled')
+                      setDetail(null)
+                    }}
+                  >
+                    <X className="mr-1.5 h-4 w-4" /> Cancel
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const removeId = detail.id
+                    setDetail(null)
+                    setDeleteId(removeId)
+                  }}
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
