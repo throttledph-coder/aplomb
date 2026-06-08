@@ -3,9 +3,12 @@ import { getDb } from './db'
 import type {
   Application,
   ApplicationStatus,
+  Interview,
+  InterviewScheduleStatus,
   InterviewSession,
   KeywordMatches,
   NewApplication,
+  NewInterview,
   NewInterviewSession,
   NewQAPair,
   NewResume,
@@ -16,6 +19,7 @@ import type {
   Resume,
   TranscriptChunk,
   UpdateApplication,
+  UpdateInterview,
   UpdateInterviewSession,
   UpdateQAPair,
 } from '../../types'
@@ -590,4 +594,145 @@ export function updateApplication(id: number, patch: UpdateApplication): Applica
 
 export function deleteApplication(id: number): void {
   getDb().prepare('DELETE FROM applications WHERE id = ?').run(id)
+}
+
+// ---------- scheduled interviews (calendar) ----------
+interface RawInterview {
+  id: number
+  application_id: number | null
+  resume_id: number | null
+  session_id: number | null
+  company: string
+  job_title: string
+  interview_type: string
+  job_description: string | null
+  round_name: string | null
+  location: string | null
+  scheduled_at: string
+  duration_min: number
+  status: string
+  notes: string | null
+  remind_day_of: number
+  remind_mins_before: number | null
+  notified_day_of: number
+  notified_before: number
+  created_at: string
+  updated_at: string
+}
+
+function mapInterview(r: RawInterview): Interview {
+  return {
+    ...r,
+    interview_type: r.interview_type as Interview['interview_type'],
+    status: r.status as InterviewScheduleStatus,
+    remind_day_of: !!r.remind_day_of,
+    notified_day_of: !!r.notified_day_of,
+    notified_before: !!r.notified_before,
+  }
+}
+
+export function createInterview(input: NewInterview): Interview {
+  const db = getDb()
+  const info = db
+    .prepare(
+      `INSERT INTO interviews
+         (application_id, resume_id, session_id, company, job_title, interview_type,
+          job_description, round_name, location, scheduled_at, duration_min, status,
+          notes, remind_day_of, remind_mins_before)
+       VALUES
+         (@application_id, @resume_id, @session_id, @company, @job_title, @interview_type,
+          @job_description, @round_name, @location, @scheduled_at, @duration_min, @status,
+          @notes, @remind_day_of, @remind_mins_before)`,
+    )
+    .run({
+      application_id: input.application_id ?? null,
+      resume_id: input.resume_id ?? null,
+      session_id: input.session_id ?? null,
+      company: input.company,
+      job_title: input.job_title,
+      interview_type: input.interview_type ?? 'mixed',
+      job_description: input.job_description ?? null,
+      round_name: input.round_name ?? null,
+      location: input.location ?? null,
+      scheduled_at: input.scheduled_at,
+      duration_min: input.duration_min ?? 45,
+      status: input.status ?? 'upcoming',
+      notes: input.notes ?? null,
+      remind_day_of: bit(input.remind_day_of ?? true),
+      remind_mins_before: input.remind_mins_before ?? null,
+    })
+  return getInterview(Number(info.lastInsertRowid))!
+}
+
+export function getInterview(id: number): Interview | null {
+  const row = getDb().prepare('SELECT * FROM interviews WHERE id = ?').get(id) as
+    | RawInterview
+    | undefined
+  return row ? mapInterview(row) : null
+}
+
+export function listInterviews(): Interview[] {
+  const rows = getDb()
+    .prepare('SELECT * FROM interviews ORDER BY scheduled_at ASC')
+    .all() as RawInterview[]
+  return rows.map(mapInterview)
+}
+
+// Upcoming events the reminder scheduler still needs to consider.
+export function listUpcomingInterviews(): Interview[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM interviews WHERE status = 'upcoming' ORDER BY scheduled_at ASC")
+    .all() as RawInterview[]
+  return rows.map(mapInterview)
+}
+
+export function updateInterview(id: number, patch: UpdateInterview): Interview | null {
+  const sets: string[] = []
+  const params: Record<string, unknown> = { id }
+  const set = (col: string, value: unknown) => {
+    sets.push(`${col} = @${col}`)
+    params[col] = value
+  }
+  if (patch.application_id !== undefined) set('application_id', patch.application_id)
+  if (patch.resume_id !== undefined) set('resume_id', patch.resume_id)
+  if (patch.session_id !== undefined) set('session_id', patch.session_id)
+  if (patch.company !== undefined) set('company', patch.company)
+  if (patch.job_title !== undefined) set('job_title', patch.job_title)
+  if (patch.interview_type !== undefined) set('interview_type', patch.interview_type)
+  if (patch.job_description !== undefined) set('job_description', patch.job_description)
+  if (patch.round_name !== undefined) set('round_name', patch.round_name)
+  if (patch.location !== undefined) set('location', patch.location)
+  if (patch.scheduled_at !== undefined) set('scheduled_at', patch.scheduled_at)
+  if (patch.duration_min !== undefined) set('duration_min', patch.duration_min)
+  if (patch.status !== undefined) set('status', patch.status)
+  if (patch.notes !== undefined) set('notes', patch.notes)
+  if (patch.remind_day_of !== undefined) set('remind_day_of', bit(patch.remind_day_of))
+  if (patch.remind_mins_before !== undefined) set('remind_mins_before', patch.remind_mins_before)
+  if (patch.notified_day_of !== undefined) set('notified_day_of', bit(patch.notified_day_of))
+  if (patch.notified_before !== undefined) set('notified_before', bit(patch.notified_before))
+  if (sets.length > 0) {
+    sets.push("updated_at = datetime('now')")
+    getDb()
+      .prepare(`UPDATE interviews SET ${sets.join(', ')} WHERE id = @id`)
+      .run(params)
+  }
+  return getInterview(id)
+}
+
+// Mark a reminder as sent so the scheduler never re-fires it.
+export function markInterviewNotified(
+  id: number,
+  flags: { day_of?: boolean; before?: boolean },
+): void {
+  const sets: string[] = []
+  if (flags.day_of) sets.push('notified_day_of = 1')
+  if (flags.before) sets.push('notified_before = 1')
+  if (sets.length === 0) return
+  getDb()
+    .prepare(`UPDATE interviews SET ${sets.join(', ')}, updated_at = datetime('now') WHERE id = ?`)
+    .run(id)
+}
+
+export function deleteInterview(id: number): void {
+  getDb().prepare('DELETE FROM interviews WHERE id = ?').run(id)
 }

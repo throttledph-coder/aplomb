@@ -35,5 +35,11 @@ dist-electron/
 .env.*
 *.pem
 
+# Local secret/recovery backups (never commit)
+github-recovery-codes.txt
+stripe_backup_code.txt
+*recovery-codes*.txt
+*backup_code*.txt
+
 # Local tooling
 .claude/

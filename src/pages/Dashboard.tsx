@@ -1,14 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, FileText, Clock, Briefcase, MessageSquare, Gauge, Target } from 'lucide-react'
+import { Plus, FileText, Clock, Briefcase, MessageSquare, Gauge, Target, Radio, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAppStore } from '@/store/app-store'
 import { scoreAnswer } from '@/lib/eval/answer-scorer'
+import { relativeWhen } from '@/lib/calendar/grouping'
+import { launchInterviewSession } from '@/lib/calendar/launch'
 import type { AnswerLength } from '@/lib/providers/types'
-import type { InterviewSession, Resume } from '@/types'
+import type { Interview, InterviewSession, Resume } from '@/types'
 
 function greeting(): string {
   const h = new Date().getHours()
@@ -44,6 +46,8 @@ export default function Dashboard() {
   const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [resumes, setResumes] = useState<Resume[]>([])
   const [appCount, setAppCount] = useState(0)
+  const [nextInterview, setNextInterview] = useState<Interview | null>(null)
+  const [upcomingMore, setUpcomingMore] = useState<Interview[]>([])
   const [questionCount, setQuestionCount] = useState(0)
   const [avgPct, setAvgPct] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -55,14 +59,23 @@ export default function Dashboard() {
     }
     void (async () => {
       try {
-        const [s, r, apps] = await Promise.all([
+        const [s, r, apps, interviews] = await Promise.all([
           window.db.session.list(),
           window.db.resume.list(),
           window.db.application.list(),
+          window.db.interview.list(),
         ])
         setSessions(s)
         setResumes(r)
         setAppCount(apps.length)
+
+        // Soonest upcoming interview still in the future (list is asc by date).
+        const nowMs = Date.now()
+        const upcoming = interviews.filter(
+          (i) => i.status === 'upcoming' && new Date(i.scheduled_at).getTime() >= nowMs,
+        )
+        setNextInterview(upcoming[0] ?? null)
+        setUpcomingMore(upcoming.slice(1, 3))
 
         // Questions practiced + average answer score across all sessions (small N).
         const length = (useAppStore.getState().settings.answer_length ?? 'detailed') as AnswerLength
@@ -117,24 +130,65 @@ export default function Dashboard() {
         )}
       </div>
 
-      <Card>
-        <CardContent className="flex items-center justify-between gap-4 py-6">
-          <div>
-            <p className="flex items-center gap-2 text-base font-medium">
-              <Target className="h-4 w-4 text-primary" /> Ready for your next interview?
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {sessions[0]
-                ? `Your last prep: ${sessions[0].company} — ${sessions[0].job_title}`
-                : 'Set up your resume and a job description to begin.'}
-            </p>
-          </div>
-          <Button onClick={() => navigate('/setup/resume')}>
-            <Plus className="mr-2 h-4 w-4" />
-            Start New Interview Session
-          </Button>
-        </CardContent>
-      </Card>
+      {nextInterview ? (
+        <Card>
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 py-6">
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <CalendarDays className="h-3.5 w-3.5 text-primary" /> Up next
+                <span className="font-semibold normal-case tracking-normal text-primary">
+                  · {relativeWhen(nextInterview.scheduled_at, new Date())}
+                </span>
+              </p>
+              <p className="mt-1 truncate text-base font-medium">
+                {nextInterview.company} — {nextInterview.job_title}
+              </p>
+              {upcomingMore.length > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Then:{' '}
+                  {upcomingMore
+                    .map((i) => `${i.company} (${relativeWhen(i.scheduled_at, new Date())})`)
+                    .join(' · ')}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => navigate('/calendar')}>
+                View calendar
+              </Button>
+              <Button onClick={() => void launchInterviewSession(nextInterview, navigate)}>
+                <Radio className="mr-2 h-4 w-4" />
+                Start live session
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 py-6">
+            <div>
+              <p className="flex items-center gap-2 text-base font-medium">
+                <Target className="h-4 w-4 text-primary" /> Ready for your next interview?
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {sessions[0]
+                  ? `Your last prep: ${sessions[0].company} — ${sessions[0].job_title}`
+                  : 'Set up your resume and a job description to begin.'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => navigate('/calendar')}>
+                <CalendarDays className="mr-2 h-4 w-4" />
+                Schedule interview
+              </Button>
+              <Button onClick={() => navigate('/setup/resume')}>
+                <Plus className="mr-2 h-4 w-4" />
+                Start New Interview Session
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <section>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Recent Sessions</h2>

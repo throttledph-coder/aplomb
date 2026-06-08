@@ -232,3 +232,67 @@ export interface UpdateApplication {
   notes?: string | null
   applied_at?: string | null
 }
+
+// ===== Scheduled interviews (calendar) =====
+export type InterviewScheduleStatus = 'upcoming' | 'completed' | 'cancelled'
+
+export interface Interview {
+  id: number
+  application_id: number | null
+  resume_id: number | null
+  session_id: number | null
+  company: string
+  job_title: string
+  interview_type: InterviewType
+  job_description: string | null
+  round_name: string | null
+  location: string | null
+  scheduled_at: string
+  duration_min: number
+  status: InterviewScheduleStatus
+  notes: string | null
+  remind_day_of: boolean
+  remind_mins_before: number | null
+  notified_day_of: boolean
+  notified_before: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface NewInterview {
+  application_id?: number | null
+  resume_id?: number | null
+  session_id?: number | null
+  company: string
+  job_title: string
+  interview_type?: InterviewType
+  job_description?: string | null
+  round_name?: string | null
+  location?: string | null
+  scheduled_at: string
+  duration_min?: number | null
+  status?: InterviewScheduleStatus
+  notes?: string | null
+  remind_day_of?: boolean
+  remind_mins_before?: number | null
+}
+
+export interface UpdateInterview {
+  application_id?: number | null
+  resume_id?: number | null
+  session_id?: number | null
+  company?: string
+  job_title?: string
+  interview_type?: InterviewType
+  job_description?: string | null
+  round_name?: string | null
+  location?: string | null
+  scheduled_at?: string
+  duration_min?: number | null
+  status?: InterviewScheduleStatus
+  notes?: string | null
+  remind_day_of?: boolean
+  remind_mins_before?: number | null
+  notified_day_of?: boolean
+  notified_before?: boolean
+}

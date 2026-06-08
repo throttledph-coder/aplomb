@@ -86,6 +86,13 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('db:application:delete', (_e, id: number) => q.deleteApplication(id))
 
+  // scheduled interviews (calendar)
+  ipcMain.handle('db:interview:create', (_e, input) => q.createInterview(input))
+  ipcMain.handle('db:interview:get', (_e, id: number) => q.getInterview(id))
+  ipcMain.handle('db:interview:list', () => q.listInterviews())
+  ipcMain.handle('db:interview:update', (_e, id: number, patch) => q.updateInterview(id, patch))
+  ipcMain.handle('db:interview:delete', (_e, id: number) => q.deleteInterview(id))
+
   // resume parsing (pdf-parse / mammoth run here in the main process)
   ipcMain.handle('parser:resumeFile', (_e, fileName: string, data: Uint8Array) =>
     parseResumeFile(fileName, data),

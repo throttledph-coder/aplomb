@@ -50,6 +50,13 @@ contextBridge.exposeInMainWorld('db', {
     update: (id: number, patch: unknown) => invoke('db:application:update', id, patch),
     delete: (id: number) => invoke('db:application:delete', id),
   },
+  interview: {
+    create: (input: unknown) => invoke('db:interview:create', input),
+    get: (id: number) => invoke('db:interview:get', id),
+    list: () => invoke('db:interview:list'),
+    update: (id: number, patch: unknown) => invoke('db:interview:update', id, patch),
+    delete: (id: number) => invoke('db:interview:delete', id),
+  },
 })
 
 // --------- Resume parser API (pdf/docx/text parsing in the main process) ---------
@@ -95,6 +102,12 @@ contextBridge.exposeInMainWorld('app', {
   openExternal: (url: string) => invoke('app:openExternal', url),
   logError: (scope: string, message: string) => invoke('app:logError', scope, message),
   openLogs: () => invoke('app:openLogs'),
+  // Fired by the reminder scheduler when the user clicks an interview toast.
+  onInterviewNavigate: (cb: (id: number) => void) => {
+    const listener = (_e: unknown, id: number) => cb(id)
+    ipcRenderer.on('interview:navigate', listener)
+    return () => ipcRenderer.off('interview:navigate', listener)
+  },
 })
 
 // --------- Pro licensing ---------

@@ -87,12 +87,43 @@ CREATE TABLE IF NOT EXISTS applications (
   updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- =============================================
+-- SCHEDULED INTERVIEWS (calendar)
+-- =============================================
+-- A dated interview event. Optionally linked to a tracked application and to the
+-- live session that gets launched from it. Carries enough context (company, JD,
+-- resume, type) to one-click-launch a session, skipping the setup wizard.
+CREATE TABLE IF NOT EXISTS interviews (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  application_id     INTEGER REFERENCES applications(id) ON DELETE SET NULL,
+  resume_id          INTEGER REFERENCES resumes(id) ON DELETE SET NULL,
+  session_id         INTEGER REFERENCES interview_sessions(id) ON DELETE SET NULL,
+  company            TEXT NOT NULL,
+  job_title          TEXT NOT NULL,
+  interview_type     TEXT NOT NULL DEFAULT 'mixed',
+  job_description    TEXT,
+  round_name         TEXT,                            -- "Phone screen", "Technical", "Onsite"
+  location           TEXT,                            -- room or meeting URL
+  scheduled_at       DATETIME NOT NULL,               -- ISO; local start time
+  duration_min       INTEGER DEFAULT 45,
+  status             TEXT NOT NULL DEFAULT 'upcoming', -- upcoming|completed|cancelled
+  notes              TEXT,
+  remind_day_of      BOOLEAN DEFAULT 1,
+  remind_mins_before INTEGER DEFAULT 30,              -- null/0 = off
+  notified_day_of    BOOLEAN DEFAULT 0,
+  notified_before    BOOLEAN DEFAULT 0,
+  created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_sessions_resume ON interview_sessions(resume_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_started ON interview_sessions(started_at);
 CREATE INDEX IF NOT EXISTS idx_qa_session ON qa_pairs(session_id);
 CREATE INDEX IF NOT EXISTS idx_qa_order ON qa_pairs(session_id, sequence_order);
 CREATE INDEX IF NOT EXISTS idx_transcript_session ON transcript_chunks(session_id);
 CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
+CREATE INDEX IF NOT EXISTS idx_interviews_scheduled ON interviews(scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_interviews_status ON interviews(status);
 `
 
 // Default settings seeded once (INSERT OR IGNORE keyed on the UNIQUE key column).
