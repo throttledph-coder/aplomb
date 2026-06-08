@@ -7,6 +7,15 @@
   "directories": {
     "output": "release/${version}"
   },
+  // GitHub Releases provider so electron-builder emits latest.yml + .blockmap
+  // (the metadata electron-updater reads to detect + download new versions).
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "throttledph-coder",
+      "repo": "aplomb"
+    }
+  ],
   "files": [
     "dist",
     "dist-electron"

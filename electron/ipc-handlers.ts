@@ -2,6 +2,7 @@ import { ipcMain, shell } from 'electron'
 import * as q from '../src/lib/database/queries'
 import { parseResumeFile, parseResumeText } from '../src/lib/parsers/resume-parser'
 import { enableStealth, disableStealth, isStealthActive } from './stealth-manager'
+import { checkForUpdates, downloadUpdate, quitAndInstall } from './updater'
 import { verifyLicense } from '../src/lib/license'
 import { logError, getLogsDir } from './logger'
 import {
@@ -44,6 +45,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('db:session:listByResume', (_e, resumeId: number) =>
     q.listSessionsByResume(resumeId),
   )
+  ipcMain.handle('db:session:listByApplication', (_e, applicationId: number) =>
+    q.listSessionsByApplication(applicationId),
+  )
   ipcMain.handle('db:session:update', (_e, id: number, patch) => q.updateSession(id, patch))
   ipcMain.handle(
     'db:session:end',
@@ -80,6 +84,8 @@ export function registerIpcHandlers(): void {
 
   // applications (job tracker)
   ipcMain.handle('db:application:create', (_e, input) => q.createApplication(input))
+  ipcMain.handle('db:application:get', (_e, id: number) => q.getApplication(id))
+  ipcMain.handle('db:application:upsertForJob', (_e, input) => q.upsertApplicationForJob(input))
   ipcMain.handle('db:application:list', () => q.listApplications())
   ipcMain.handle('db:application:update', (_e, id: number, patch) =>
     q.updateApplication(id, patch),
@@ -128,6 +134,11 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ai:analyzeFit', (_e, input: ApplyInput) => analyzeFit(input))
   ipcMain.handle('ai:draftCoverLetter', (_e, input: ApplyInput) => draftCoverLetter(input))
   ipcMain.handle('ai:structureResume', (_e, rawText: string) => structureResume(rawText))
+
+  // in-app updates (electron-updater; no-op in dev)
+  ipcMain.handle('updater:check', () => checkForUpdates())
+  ipcMain.handle('updater:download', () => downloadUpdate())
+  ipcMain.handle('updater:install', () => quitAndInstall())
 
   // stealth mode (premium)
   ipcMain.handle('stealth:enable', () => enableStealth())

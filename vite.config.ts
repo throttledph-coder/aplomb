@@ -26,7 +26,7 @@ export default defineConfig({
               // Keep node-only libs external so they load from node_modules at
               // runtime: better-sqlite3 (native .node binary), pdf-parse (pdfjs)
               // and mammoth (jszip).
-              external: ['better-sqlite3', 'pdf-parse', 'mammoth', 'groq-sdk'],
+              external: ['better-sqlite3', 'pdf-parse', 'mammoth', 'groq-sdk', 'electron-updater'],
             },
           },
         },

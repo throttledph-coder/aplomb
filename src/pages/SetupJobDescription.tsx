@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import {
   JobDescriptionForm,
   type JobDescriptionValues,
 } from '@/components/setup/JobDescriptionForm'
-import { useAppStore } from '@/store/app-store'
+import { startSessionForJob } from '@/lib/sessions/start'
 
 const STEPS = [
   'Analyzing job description…',
@@ -25,8 +24,6 @@ export default function SetupJobDescription() {
   const resumeId = state?.resumeId ?? null
   const prefill = state?.prefill
 
-  const incrementSession = useAppStore((s) => s.incrementSession)
-  const refreshActiveSession = useAppStore((s) => s.refreshActiveSession)
   const [submitting, setSubmitting] = useState(false)
   const [step, setStep] = useState(0)
 
@@ -38,18 +35,14 @@ export default function SetupJobDescription() {
   async function onSubmit(values: JobDescriptionValues) {
     if (resumeId === null || !window.db) return
     setSubmitting(true)
-    try {
-      const session = await window.db.session.create({ resume_id: resumeId, ...values })
-      await incrementSession()
-      await refreshActiveSession()
-      // Cosmetic pre-analysis progress (docs/08).
-      for (let i = 0; i < STEPS.length; i++) {
-        setStep(i + 1)
-        await new Promise((r) => setTimeout(r, 450))
-      }
-      navigate(`/session/${session.id}`)
-    } catch (err) {
-      toast.error(`Could not start session: ${(err as Error).message}`)
+    // Cosmetic pre-analysis progress (docs/08).
+    for (let i = 0; i < STEPS.length; i++) {
+      setStep(i + 1)
+      await new Promise((r) => setTimeout(r, 450))
+    }
+    // Shared path: find-or-create the application, link the session, navigate.
+    const id = await startSessionForJob({ resumeId, ...values }, navigate)
+    if (id === null) {
       setSubmitting(false)
       setStep(0)
     }

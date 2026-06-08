@@ -6,6 +6,7 @@ import { registerIpcHandlers } from './ipc-handlers'
 import { setMainWindow } from './windows'
 import { enableStealth, disableStealth, isStealthActive } from './stealth-manager'
 import { startReminderScheduler } from './reminder-scheduler'
+import { setupUpdater } from './updater'
 import { logError } from './logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -155,4 +156,6 @@ app.whenReady().then(() => {
   registerHotkeys()
   // Interview reminders: catch-up tick now + poll while the app runs.
   startReminderScheduler(() => win)
+  // In-app updates (no-op in dev): auto-check on launch, user downloads/installs.
+  setupUpdater(() => win)
 })

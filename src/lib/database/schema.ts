@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS resumes (
 CREATE TABLE IF NOT EXISTS interview_sessions (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
   resume_id         INTEGER NOT NULL REFERENCES resumes(id),
+  application_id    INTEGER REFERENCES applications(id) ON DELETE SET NULL,
   session_name      TEXT,
   company           TEXT NOT NULL,
   job_title         TEXT NOT NULL,
@@ -108,6 +109,7 @@ CREATE TABLE IF NOT EXISTS interviews (
   duration_min       INTEGER DEFAULT 45,
   status             TEXT NOT NULL DEFAULT 'upcoming', -- upcoming|completed|cancelled
   notes              TEXT,
+  additional_info    TEXT,                            -- personal context carried into a launched session
   remind_day_of      BOOLEAN DEFAULT 1,
   remind_mins_before INTEGER DEFAULT 30,              -- null/0 = off
   notified_day_of    BOOLEAN DEFAULT 0,
@@ -165,11 +167,18 @@ export function applySchema(db: Database.Database): void {
     "UPDATE settings SET value = 'llama-3.3-70b-versatile' WHERE key = 'ai_model' AND value = 'llama-3.1-70b-versatile'",
   ).run()
 
-  // Additive column for optional candidate "Additional Info" (no ADD COLUMN IF
-  // NOT EXISTS in SQLite — ignore the duplicate-column throw on migrated DBs).
-  try {
-    db.exec('ALTER TABLE interview_sessions ADD COLUMN additional_info TEXT')
-  } catch {
-    /* column already exists */
+  // Additive columns (no ADD COLUMN IF NOT EXISTS in SQLite — ignore the
+  // duplicate-column throw on already-migrated DBs).
+  const addColumn = (sql: string) => {
+    try {
+      db.exec(sql)
+    } catch {
+      /* column already exists */
+    }
   }
+  addColumn('ALTER TABLE interview_sessions ADD COLUMN additional_info TEXT')
+  // 0.14.0 — connect the pillars: sessions link to a tracked application; an
+  // interview carries the personal context used when launching its session.
+  addColumn('ALTER TABLE interview_sessions ADD COLUMN application_id INTEGER REFERENCES applications(id) ON DELETE SET NULL')
+  addColumn('ALTER TABLE interviews ADD COLUMN additional_info TEXT')
 }

@@ -18,6 +18,7 @@ function makeInterview(overrides: Partial<Interview> = {}): Interview {
     duration_min: 45,
     status: 'upcoming',
     notes: null,
+    additional_info: null,
     remind_day_of: true,
     remind_mins_before: 30,
     notified_day_of: false,

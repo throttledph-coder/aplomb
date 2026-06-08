@@ -1,5 +1,6 @@
 import { safeStorage } from 'electron'
 import { getDb } from './db'
+import { matchKey, nextStatus } from '../applications/link'
 import type {
   Application,
   ApplicationStatus,
@@ -80,6 +81,7 @@ interface RawResume {
 interface RawSession {
   id: number
   resume_id: number
+  application_id: number | null
   session_name: string | null
   company: string
   job_title: string
@@ -269,12 +271,13 @@ export function createSession(input: NewInterviewSession): InterviewSession {
   const info = db
     .prepare(
       `INSERT INTO interview_sessions
-         (resume_id, session_name, company, job_title, interview_type, job_description, parsed_jd, additional_info)
+         (resume_id, application_id, session_name, company, job_title, interview_type, job_description, parsed_jd, additional_info)
        VALUES
-         (@resume_id, @session_name, @company, @job_title, @interview_type, @job_description, @parsed_jd, @additional_info)`,
+         (@resume_id, @application_id, @session_name, @company, @job_title, @interview_type, @job_description, @parsed_jd, @additional_info)`,
     )
     .run({
       resume_id: input.resume_id,
+      application_id: input.application_id ?? null,
       session_name: input.session_name ?? null,
       company: input.company,
       job_title: input.job_title,
@@ -307,6 +310,13 @@ export function listSessionsByResume(resumeId: number): InterviewSession[] {
   return rows.map(mapSession)
 }
 
+export function listSessionsByApplication(applicationId: number): InterviewSession[] {
+  const rows = getDb()
+    .prepare('SELECT * FROM interview_sessions WHERE application_id = ? ORDER BY started_at DESC')
+    .all(applicationId) as RawSession[]
+  return rows.map(mapSession)
+}
+
 export function updateSession(
   id: number,
   patch: UpdateInterviewSession,
@@ -317,6 +327,7 @@ export function updateSession(
     sets.push(`${col} = @${col}`)
     params[col] = value
   }
+  if (patch.application_id !== undefined) set('application_id', patch.application_id)
   if (patch.session_name !== undefined) set('session_name', patch.session_name)
   if (patch.company !== undefined) set('company', patch.company)
   if (patch.job_title !== undefined) set('job_title', patch.job_title)
@@ -596,6 +607,32 @@ export function deleteApplication(id: number): void {
   getDb().prepare('DELETE FROM applications WHERE id = ?').run(id)
 }
 
+// Find-or-create the application for a job (case-insensitive company+title match),
+// so every session started for a job feeds the tracker. Bumps an early-stage
+// match to 'interview' (never downgrades later stages) and fills an empty JD.
+export function upsertApplicationForJob(input: {
+  company: string
+  job_title: string
+  job_description?: string | null
+}): Application {
+  const key = matchKey(input.company, input.job_title)
+  const existing = listApplications().find((a) => matchKey(a.company, a.job_title) === key)
+  if (existing) {
+    const patch: UpdateApplication = {}
+    const bumped = nextStatus(existing.status)
+    if (bumped !== existing.status) patch.status = bumped
+    if (!existing.job_description && input.job_description) patch.job_description = input.job_description
+    return Object.keys(patch).length > 0 ? updateApplication(existing.id, patch)! : existing
+  }
+  return createApplication({
+    company: input.company,
+    job_title: input.job_title,
+    job_description: input.job_description ?? null,
+    status: 'interview',
+    applied_at: new Date().toISOString(),
+  })
+}
+
 // ---------- scheduled interviews (calendar) ----------
 interface RawInterview {
   id: number
@@ -612,6 +649,7 @@ interface RawInterview {
   duration_min: number
   status: string
   notes: string | null
+  additional_info: string | null
   remind_day_of: number
   remind_mins_before: number | null
   notified_day_of: number
@@ -638,11 +676,11 @@ export function createInterview(input: NewInterview): Interview {
       `INSERT INTO interviews
          (application_id, resume_id, session_id, company, job_title, interview_type,
           job_description, round_name, location, scheduled_at, duration_min, status,
-          notes, remind_day_of, remind_mins_before)
+          notes, additional_info, remind_day_of, remind_mins_before)
        VALUES
          (@application_id, @resume_id, @session_id, @company, @job_title, @interview_type,
           @job_description, @round_name, @location, @scheduled_at, @duration_min, @status,
-          @notes, @remind_day_of, @remind_mins_before)`,
+          @notes, @additional_info, @remind_day_of, @remind_mins_before)`,
     )
     .run({
       application_id: input.application_id ?? null,
@@ -658,6 +696,7 @@ export function createInterview(input: NewInterview): Interview {
       duration_min: input.duration_min ?? 45,
       status: input.status ?? 'upcoming',
       notes: input.notes ?? null,
+      additional_info: input.additional_info ?? null,
       remind_day_of: bit(input.remind_day_of ?? true),
       remind_mins_before: input.remind_mins_before ?? null,
     })
@@ -706,6 +745,7 @@ export function updateInterview(id: number, patch: UpdateInterview): Interview |
   if (patch.duration_min !== undefined) set('duration_min', patch.duration_min)
   if (patch.status !== undefined) set('status', patch.status)
   if (patch.notes !== undefined) set('notes', patch.notes)
+  if (patch.additional_info !== undefined) set('additional_info', patch.additional_info)
   if (patch.remind_day_of !== undefined) set('remind_day_of', bit(patch.remind_day_of))
   if (patch.remind_mins_before !== undefined) set('remind_mins_before', patch.remind_mins_before)
   if (patch.notified_day_of !== undefined) set('notified_day_of', bit(patch.notified_day_of))

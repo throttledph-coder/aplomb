@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('db', {
     get: (id: number) => invoke('db:session:get', id),
     list: () => invoke('db:session:list'),
     listByResume: (resumeId: number) => invoke('db:session:listByResume', resumeId),
+    listByApplication: (applicationId: number) =>
+      invoke('db:session:listByApplication', applicationId),
     update: (id: number, patch: unknown) => invoke('db:session:update', id, patch),
     end: (id: number, durationSec: number, report?: unknown, keywords?: unknown) =>
       invoke('db:session:end', id, durationSec, report, keywords),
@@ -46,6 +48,8 @@ contextBridge.exposeInMainWorld('db', {
   },
   application: {
     create: (input: unknown) => invoke('db:application:create', input),
+    get: (id: number) => invoke('db:application:get', id),
+    upsertForJob: (input: unknown) => invoke('db:application:upsertForJob', input),
     list: () => invoke('db:application:list'),
     update: (id: number, patch: unknown) => invoke('db:application:update', id, patch),
     delete: (id: number) => invoke('db:application:delete', id),
@@ -107,6 +111,18 @@ contextBridge.exposeInMainWorld('app', {
     const listener = (_e: unknown, id: number) => cb(id)
     ipcRenderer.on('interview:navigate', listener)
     return () => ipcRenderer.off('interview:navigate', listener)
+  },
+})
+
+// --------- In-app updates (electron-updater) ---------
+contextBridge.exposeInMainWorld('updater', {
+  check: () => invoke('updater:check'),
+  download: () => invoke('updater:download'),
+  install: () => invoke('updater:install'),
+  onEvent: (cb: (e: { type: string; payload?: unknown }) => void) => {
+    const listener = (_e: unknown, payload: { type: string; payload?: unknown }) => cb(payload)
+    ipcRenderer.on('updater:event', listener)
+    return () => ipcRenderer.off('updater:event', listener)
   },
 })
 

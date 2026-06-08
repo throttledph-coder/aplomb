@@ -81,6 +81,7 @@ export interface NewResume {
 export interface InterviewSession {
   id: number
   resume_id: number
+  application_id: number | null
   session_name: string | null
   company: string
   job_title: string
@@ -99,6 +100,7 @@ export interface InterviewSession {
 
 export interface NewInterviewSession {
   resume_id: number
+  application_id?: number | null
   session_name?: string | null
   company: string
   job_title: string
@@ -109,6 +111,7 @@ export interface NewInterviewSession {
 }
 
 export interface UpdateInterviewSession {
+  application_id?: number | null
   session_name?: string | null
   company?: string
   job_title?: string
@@ -251,6 +254,7 @@ export interface Interview {
   duration_min: number
   status: InterviewScheduleStatus
   notes: string | null
+  additional_info: string | null
   remind_day_of: boolean
   remind_mins_before: number | null
   notified_day_of: boolean
@@ -273,6 +277,7 @@ export interface NewInterview {
   duration_min?: number | null
   status?: InterviewScheduleStatus
   notes?: string | null
+  additional_info?: string | null
   remind_day_of?: boolean
   remind_mins_before?: number | null
 }
@@ -291,6 +296,7 @@ export interface UpdateInterview {
   duration_min?: number | null
   status?: InterviewScheduleStatus
   notes?: string | null
+  additional_info?: string | null
   remind_day_of?: boolean
   remind_mins_before?: number | null
   notified_day_of?: boolean
