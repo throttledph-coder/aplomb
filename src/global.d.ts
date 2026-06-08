@@ -1,8 +1,10 @@
 import type {
   Application,
+  Interview,
   InterviewSession,
   KeywordMatches,
   NewApplication,
+  NewInterview,
   NewInterviewSession,
   NewQAPair,
   NewResume,
@@ -12,6 +14,7 @@ import type {
   Resume,
   TranscriptChunk,
   UpdateApplication,
+  UpdateInterview,
   UpdateInterviewSession,
   UpdateQAPair,
 } from './types'
@@ -123,6 +126,13 @@ export interface ClarityDbApi {
     update(id: number, patch: UpdateApplication): Promise<Application | null>
     delete(id: number): Promise<void>
   }
+  interview: {
+    create(input: NewInterview): Promise<Interview>
+    get(id: number): Promise<Interview | null>
+    list(): Promise<Interview[]>
+    update(id: number, patch: UpdateInterview): Promise<Interview | null>
+    delete(id: number): Promise<void>
+  }
 }
 
 export interface ClarityStealthApi {
@@ -149,6 +159,8 @@ export interface ClarityAppApi {
   openExternal(url: string): Promise<void>
   logError(scope: string, message: string): Promise<void>
   openLogs(): Promise<void>
+  // Subscribe to reminder-toast clicks; returns an unsubscribe fn.
+  onInterviewNavigate(cb: (id: number) => void): () => void
 }
 
 declare global {

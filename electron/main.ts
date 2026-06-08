@@ -5,6 +5,7 @@ import { initDatabase, closeDatabase } from '../src/lib/database/db'
 import { registerIpcHandlers } from './ipc-handlers'
 import { setMainWindow } from './windows'
 import { enableStealth, disableStealth, isStealthActive } from './stealth-manager'
+import { startReminderScheduler } from './reminder-scheduler'
 import { logError } from './logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -120,6 +121,10 @@ const CSP =
   "media-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 
 app.whenReady().then(() => {
+  // Stable AppUserModelID so Windows attributes toast notifications (interview
+  // reminders) to Aplomb rather than to electron.exe.
+  app.setAppUserModelId('com.aplomb.app')
+
   // Remove the default Electron menu bar (File/Edit/View/Window/Help).
   Menu.setApplicationMenu(null)
 
@@ -148,4 +153,6 @@ app.whenReady().then(() => {
   registerIpcHandlers()
   createWindow()
   registerHotkeys()
+  // Interview reminders: catch-up tick now + poll while the app runs.
+  startReminderScheduler(() => win)
 })

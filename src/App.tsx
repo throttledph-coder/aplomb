@@ -15,6 +15,7 @@ import SetupJobDescription from '@/pages/SetupJobDescription'
 import LiveSession from '@/pages/LiveSession'
 import SessionReport from '@/pages/SessionReport'
 import Applications from '@/pages/Applications'
+import Calendar from '@/pages/Calendar'
 import Account from '@/pages/Account'
 import Terms from '@/pages/legal/Terms'
 import Privacy from '@/pages/legal/Privacy'
@@ -73,6 +74,7 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/history" element={<History />} />
             <Route path="/applications" element={<Applications />} />
+            <Route path="/calendar" element={<Calendar />} />
             <Route path="/resumes" element={<ResumeManager />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/account" element={<Account />} />
