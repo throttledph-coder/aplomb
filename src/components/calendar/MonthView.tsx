@@ -9,11 +9,21 @@ interface MonthViewProps {
   now: Date
   onDayClick: (day: Date) => void
   onEventClick: (iv: Interview) => void
+  onMoreClick: (day: Date) => void
+  onEventDrop: (id: number, day: Date) => void
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export function MonthView({ viewDate, items, now, onDayClick, onEventClick }: MonthViewProps) {
+export function MonthView({
+  viewDate,
+  items,
+  now,
+  onDayClick,
+  onEventClick,
+  onMoreClick,
+  onEventDrop,
+}: MonthViewProps) {
   const weeks = monthMatrix(viewDate)
   const month = viewDate.getMonth()
 
@@ -45,6 +55,12 @@ export function MonthView({ viewDate, items, now, onDayClick, onEventClick }: Mo
                   onDayClick(day)
                 }
               }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault()
+                const id = Number(e.dataTransfer.getData('text/plain'))
+                if (id) onEventDrop(id, day)
+              }}
               className={cn(
                 'min-h-[5.5rem] cursor-pointer border-b border-r p-1.5 align-top transition-colors hover:bg-accent/40',
                 i % 7 === 6 && 'border-r-0',
@@ -69,6 +85,12 @@ export function MonthView({ viewDate, items, now, onDayClick, onEventClick }: Mo
                     key={iv.id}
                     role="button"
                     tabIndex={0}
+                    draggable
+                    onDragStart={(e) => {
+                      e.stopPropagation()
+                      e.dataTransfer.setData('text/plain', String(iv.id))
+                      e.dataTransfer.effectAllowed = 'move'
+                    }}
                     onClick={(e) => {
                       e.stopPropagation()
                       onEventClick(iv)
@@ -81,7 +103,7 @@ export function MonthView({ viewDate, items, now, onDayClick, onEventClick }: Mo
                       }
                     }}
                     className={cn(
-                      'truncate rounded px-1 py-0.5 text-[11px] leading-tight',
+                      'cursor-grab truncate rounded px-1 py-0.5 text-[11px] leading-tight active:cursor-grabbing',
                       eventTone(iv),
                     )}
                     title={`${fmtTime(iv.scheduled_at)} · ${iv.company} — ${iv.job_title}`}
@@ -90,7 +112,16 @@ export function MonthView({ viewDate, items, now, onDayClick, onEventClick }: Mo
                   </div>
                 ))}
                 {extra > 0 && (
-                  <div className="px-1 text-[11px] text-muted-foreground">+{extra} more</div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onMoreClick(day)
+                    }}
+                    className="px-1 text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    +{extra} more
+                  </button>
                 )}
               </div>
             </div>
