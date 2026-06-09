@@ -1,24 +1,17 @@
-// Aplomb "AP" monogram — interlocking A + P, matches the desktop app + tray +
-// installer icon. currentColor so it tints from the parent (e.g. coral brand).
+import markUrl from './assets/aplomb-mark.png'
+
+// Aplomb "AP" monogram (filled, coral) — the brand mark. Rendered as the raster
+// art so it matches the desktop app + favicon + installer exactly. Decorative.
 export function AplombMark({ size = 22, className }: { size?: number; className?: string }) {
   return (
-    <svg
+    <img
+      src={markUrl}
       width={size}
       height={size}
-      viewBox="0 0 48 48"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={4}
-      strokeLinecap="round"
-      strokeLinejoin="round"
       className={className}
+      alt=""
       aria-hidden="true"
-    >
-      <path d="M24 8 L7 44" />
-      <path d="M24 8 L41 44" />
-      <path d="M13.5 32 H34.5" />
-      <path d="M24 14 V44" />
-      <path d="M24 14 C31.5 14 31.5 26 24 26" />
-    </svg>
+      draggable={false}
+    />
   )
 }
