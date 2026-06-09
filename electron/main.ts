@@ -47,6 +47,12 @@ const PRELOAD = path.join(__dirname, 'preload.mjs')
 function createWindow() {
   win = new BrowserWindow({
     title: 'Aplomb',
+    width: 1280,
+    height: 832,
+    minWidth: 1024,
+    minHeight: 720,
+    center: true,
+    icon: path.join(process.env.VITE_PUBLIC, 'icon.png'),
     autoHideMenuBar: true,
     backgroundColor: '#262624',
     webPreferences: {
