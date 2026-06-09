@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Trash2, Pencil, ExternalLink, Sparkles, FileText, Loader2, Copy, Search, Briefcase } from 'lucide-react'
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  ExternalLink,
+  Sparkles,
+  FileText,
+  Loader2,
+  Copy,
+  Search,
+  Briefcase,
+  MoreHorizontal,
+  Radio,
+  CalendarPlus,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,13 +36,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Popover, PopoverTrigger, PopoverContent, PopoverClose } from '@/components/ui/popover'
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card'
 import { Markdown } from '@/components/report/Markdown'
 import { cn } from '@/lib/utils'
 import {
   APPLICATION_STATUSES as STATUSES,
   APPLICATION_STATUS_COLORS as STATUS_COLORS,
 } from '@/lib/applications/status'
-import type { Application, ApplicationStatus, Resume } from '@/types'
+import { startSessionForJob } from '@/lib/sessions/start'
+import { relativeWhen } from '@/lib/calendar/grouping'
+import type { Application, ApplicationStatus, Interview, Resume } from '@/types'
 
 interface DraftState {
   id: number | null
@@ -54,6 +72,7 @@ export default function Applications() {
   const navigate = useNavigate()
   const [apps, setApps] = useState<Application[]>([])
   const [resumes, setResumes] = useState<Resume[]>([])
+  const [interviews, setInterviews] = useState<Interview[]>([])
   const [resumeId, setResumeId] = useState<number | null>(null)
   const [draft, setDraft] = useState<DraftState | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
@@ -68,11 +87,70 @@ export default function Applications() {
       setLoading(false)
       return
     }
-    setApps(await window.db.application.list())
-    const rs = await window.db.resume.list()
+    const [appList, rs, ivs] = await Promise.all([
+      window.db.application.list(),
+      window.db.resume.list(),
+      window.db.interview.list(),
+    ])
+    setApps(appList)
     setResumes(rs)
+    setInterviews(ivs)
     if (resumeId === null) setResumeId((rs.find((r) => r.is_default) ?? rs[0])?.id ?? null)
     setLoading(false)
+  }
+
+  // Soonest upcoming interview for an application (for the hovercard preview).
+  function nextInterviewFor(appId: number): Interview | null {
+    const nowMs = Date.now()
+    return (
+      interviews
+        .filter(
+          (iv) =>
+            iv.application_id === appId &&
+            iv.status === 'upcoming' &&
+            new Date(iv.scheduled_at).getTime() >= nowMs,
+        )
+        .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())[0] ??
+      null
+    )
+  }
+
+  async function prepNow(a: Application) {
+    if (!window.db) return
+    let rid = resumeId
+    if (rid === null) {
+      const def = await window.db.resume.getDefault()
+      rid = def?.id ?? null
+    }
+    if (rid === null) {
+      toast.error('Add a resume first.')
+      navigate('/setup/resume')
+      return
+    }
+    await startSessionForJob(
+      {
+        resumeId: rid,
+        company: a.company,
+        job_title: a.job_title,
+        interview_type: 'mixed',
+        job_description: a.job_description ?? '',
+        applicationId: a.id,
+      },
+      navigate,
+    )
+  }
+
+  function scheduleInterview(a: Application) {
+    navigate('/calendar', {
+      state: {
+        newInterview: {
+          application_id: a.id,
+          company: a.company,
+          job_title: a.job_title,
+          job_description: a.job_description ?? '',
+        },
+      },
+    })
   }
 
   const groups = useMemo(() => {
@@ -247,25 +325,56 @@ export default function Applications() {
                 {g.items.map((a) => (
                   <Card key={a.id}>
                     <CardContent className="flex items-center justify-between py-3">
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => navigate(`/applications/${a.id}`)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            navigate(`/applications/${a.id}`)
-                          }
-                        }}
-                        className="min-w-0 cursor-pointer rounded-md p-1 -m-1 transition-colors hover:bg-accent/40"
-                      >
-                        <p className="truncate font-medium">
-                          {a.company} — {a.job_title}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Updated {new Date(a.updated_at).toLocaleDateString()}
-                        </p>
-                      </div>
+                      <HoverCard>
+                        <HoverCardTrigger asChild>
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => navigate(`/applications/${a.id}`)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                navigate(`/applications/${a.id}`)
+                              }
+                            }}
+                            className="min-w-0 cursor-pointer rounded-md p-1 -m-1 transition-colors hover:bg-accent/40"
+                          >
+                            <p className="truncate font-medium">
+                              {a.company} — {a.job_title}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Updated {new Date(a.updated_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent align="start" className="w-72">
+                          {(() => {
+                            const next = nextInterviewFor(a.id)
+                            return (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="truncate text-sm font-medium">{a.company}</p>
+                                  <Badge variant="outline" className={cn('shrink-0', STATUS_COLORS[a.status])}>
+                                    {STATUSES.find((s) => s.value === a.status)?.label}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground">{a.job_title}</p>
+                                {next && (
+                                  <p className="text-xs text-primary">
+                                    Next: {relativeWhen(next.scheduled_at, new Date())}
+                                  </p>
+                                )}
+                                {a.job_description && (
+                                  <p className="line-clamp-3 text-xs text-muted-foreground">
+                                    {a.job_description}
+                                  </p>
+                                )}
+                                <p className="text-[11px] text-muted-foreground/70">Click to open the job.</p>
+                              </div>
+                            )
+                          })()}
+                        </HoverCardContent>
+                      </HoverCard>
                       <div className="flex items-center gap-2">
                         <Select
                           value={a.status}
@@ -286,19 +395,65 @@ export default function Applications() {
                             ))}
                           </SelectContent>
                         </Select>
-                        {a.job_url && (
-                          <Button size="icon" variant="ghost" asChild>
-                            <a href={a.job_url} target="_blank" rel="noreferrer">
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          </Button>
-                        )}
-                        <Button size="icon" variant="ghost" onClick={() => openEdit(a)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" onClick={() => setDeleteId(a.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Actions">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="w-48 p-1">
+                            {[
+                              {
+                                icon: <Briefcase className="h-4 w-4" />,
+                                label: 'Open job',
+                                onClick: () => navigate(`/applications/${a.id}`),
+                              },
+                              {
+                                icon: <Radio className="h-4 w-4" />,
+                                label: 'Prep now',
+                                onClick: () => void prepNow(a),
+                              },
+                              {
+                                icon: <CalendarPlus className="h-4 w-4" />,
+                                label: 'Schedule interview',
+                                onClick: () => scheduleInterview(a),
+                              },
+                              ...(a.job_url
+                                ? [
+                                    {
+                                      icon: <ExternalLink className="h-4 w-4" />,
+                                      label: 'Open posting',
+                                      onClick: () => window.app?.openExternal(a.job_url as string),
+                                    },
+                                  ]
+                                : []),
+                              {
+                                icon: <Pencil className="h-4 w-4" />,
+                                label: 'Edit',
+                                onClick: () => openEdit(a),
+                              },
+                              {
+                                icon: <Trash2 className="h-4 w-4" />,
+                                label: 'Delete',
+                                onClick: () => setDeleteId(a.id),
+                                danger: true,
+                              },
+                            ].map((it) => (
+                              <PopoverClose asChild key={it.label}>
+                                <button
+                                  onClick={it.onClick}
+                                  className={cn(
+                                    'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-accent',
+                                    it.danger && 'text-destructive',
+                                  )}
+                                >
+                                  {it.icon}
+                                  {it.label}
+                                </button>
+                              </PopoverClose>
+                            ))}
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </CardContent>
                   </Card>

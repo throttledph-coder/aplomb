@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { weekDays, eventsForDay, minutesSinceMidnight, sameDay } from '@/lib/calendar/grid'
 import { cn } from '@/lib/utils'
 import { eventTone } from './tone'
+import { EventPopover, type EventHandlers } from './EventPopover'
 import type { Interview } from '@/types'
 
 interface WeekViewProps {
@@ -9,7 +10,7 @@ interface WeekViewProps {
   items: Interview[]
   now: Date
   onSlotClick: (slot: Date) => void
-  onEventClick: (iv: Interview) => void
+  handlers: EventHandlers
   onEventDrop: (id: number, slot: Date) => void
 }
 
@@ -32,7 +33,7 @@ export function WeekView({
   items,
   now,
   onSlotClick,
-  onEventClick,
+  handlers,
   onEventDrop,
 }: WeekViewProps) {
   const days = weekDays(viewDate)
@@ -128,32 +129,26 @@ export function WeekView({
                 const top = (minutesSinceMidnight(iv.scheduled_at) / 60) * HOUR_H
                 const height = Math.max(18, (iv.duration_min / 60) * HOUR_H)
                 return (
-                  <div
-                    key={iv.id}
-                    role="button"
-                    tabIndex={0}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData('text/plain', String(iv.id))
-                      e.dataTransfer.effectAllowed = 'move'
-                    }}
-                    onClick={() => onEventClick(iv)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        onEventClick(iv)
-                      }
-                    }}
-                    className={cn(
-                      'absolute inset-x-0.5 z-10 cursor-grab overflow-hidden rounded px-1 text-[11px] leading-tight active:cursor-grabbing',
-                      eventTone(iv),
-                    )}
-                    style={{ top, height }}
-                    title={`${iv.company} — ${iv.job_title}`}
-                  >
-                    <div className="truncate font-medium">{iv.company}</div>
-                    <div className="truncate">{iv.round_name?.trim() || iv.job_title}</div>
-                  </div>
+                  <EventPopover key={iv.id} iv={iv} now={now} handlers={handlers}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', String(iv.id))
+                        e.dataTransfer.effectAllowed = 'move'
+                      }}
+                      className={cn(
+                        'absolute inset-x-0.5 z-10 cursor-grab overflow-hidden rounded px-1 text-[11px] leading-tight active:cursor-grabbing',
+                        eventTone(iv),
+                      )}
+                      style={{ top, height }}
+                      title={`${iv.company} — ${iv.job_title}`}
+                    >
+                      <div className="truncate font-medium">{iv.company}</div>
+                      <div className="truncate">{iv.round_name?.trim() || iv.job_title}</div>
+                    </div>
+                  </EventPopover>
                 )
               })}
             </div>

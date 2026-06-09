@@ -1,6 +1,7 @@
 import { monthMatrix, eventsForDay, sameDay } from '@/lib/calendar/grid'
 import { cn } from '@/lib/utils'
 import { eventTone, fmtTime } from './tone'
+import { EventPopover, type EventHandlers } from './EventPopover'
 import type { Interview } from '@/types'
 
 interface MonthViewProps {
@@ -8,7 +9,7 @@ interface MonthViewProps {
   items: Interview[]
   now: Date
   onDayClick: (day: Date) => void
-  onEventClick: (iv: Interview) => void
+  handlers: EventHandlers
   onMoreClick: (day: Date) => void
   onEventDrop: (id: number, day: Date) => void
 }
@@ -20,7 +21,7 @@ export function MonthView({
   items,
   now,
   onDayClick,
-  onEventClick,
+  handlers,
   onMoreClick,
   onEventDrop,
 }: MonthViewProps) {
@@ -81,35 +82,26 @@ export function MonthView({
               </div>
               <div className="mt-1 space-y-1">
                 {shown.map((iv) => (
-                  <div
-                    key={iv.id}
-                    role="button"
-                    tabIndex={0}
-                    draggable
-                    onDragStart={(e) => {
-                      e.stopPropagation()
-                      e.dataTransfer.setData('text/plain', String(iv.id))
-                      e.dataTransfer.effectAllowed = 'move'
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onEventClick(iv)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
+                  <EventPopover key={iv.id} iv={iv} now={now} handlers={handlers}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      draggable
+                      onDragStart={(e) => {
                         e.stopPropagation()
-                        onEventClick(iv)
-                      }
-                    }}
-                    className={cn(
-                      'cursor-grab truncate rounded px-1 py-0.5 text-[11px] leading-tight active:cursor-grabbing',
-                      eventTone(iv),
-                    )}
-                    title={`${fmtTime(iv.scheduled_at)} · ${iv.company} — ${iv.job_title}`}
-                  >
-                    <span className="tabular-nums">{fmtTime(iv.scheduled_at)}</span> {iv.company}
-                  </div>
+                        e.dataTransfer.setData('text/plain', String(iv.id))
+                        e.dataTransfer.effectAllowed = 'move'
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className={cn(
+                        'cursor-grab truncate rounded px-1 py-0.5 text-[11px] leading-tight active:cursor-grabbing',
+                        eventTone(iv),
+                      )}
+                      title={`${fmtTime(iv.scheduled_at)} · ${iv.company} — ${iv.job_title}`}
+                    >
+                      <span className="tabular-nums">{fmtTime(iv.scheduled_at)}</span> {iv.company}
+                    </div>
+                  </EventPopover>
                 ))}
                 {extra > 0 && (
                   <button
