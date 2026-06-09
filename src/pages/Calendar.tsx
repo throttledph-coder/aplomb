@@ -46,6 +46,7 @@ import { addMonths, addWeeks, eventsForDay, monthLabel, weekRangeLabel } from '@
 import { launchInterviewSession } from '@/lib/calendar/launch'
 import { MonthView } from '@/components/calendar/MonthView'
 import { WeekView } from '@/components/calendar/WeekView'
+import { EventPopover, type EventHandlers } from '@/components/calendar/EventPopover'
 import type { Application, Interview, InterviewType, Resume } from '@/types'
 
 type CalView = 'month' | 'week' | 'agenda'
@@ -131,7 +132,6 @@ export default function Calendar() {
   const [apps, setApps] = useState<Application[]>([])
   const [draft, setDraft] = useState<DraftState | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
-  const [detail, setDetail] = useState<Interview | null>(null)
   const [dayList, setDayList] = useState<Date | null>(null)
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(() => new Date())
@@ -302,6 +302,17 @@ export default function Calendar() {
       notified_before: false,
     })
     await refresh()
+  }
+
+  // Shared event actions for the anchored EventPopover (Month/Week + day list).
+  const handlers: EventHandlers = {
+    onLaunch: (iv) => void launchInterviewSession(iv, navigate),
+    onEdit: (iv) => openEdit(iv),
+    onReport: (iv) => navigate(`/report/${iv.session_id}`),
+    onJob: (iv) => navigate(`/applications/${iv.application_id}`),
+    onComplete: (iv) => void setStatus(iv.id, 'completed'),
+    onCancel: (iv) => void setStatus(iv.id, 'cancelled'),
+    onDelete: (iv) => setDeleteId(iv.id),
   }
 
   async function confirmDelete() {
@@ -478,7 +489,7 @@ export default function Calendar() {
           items={items}
           now={now}
           onDayClick={(d) => openForDate(d, false)}
-          onEventClick={setDetail}
+          handlers={handlers}
           onMoreClick={setDayList}
           onEventDrop={(id, d) => void reschedule(id, d, true)}
         />
@@ -488,7 +499,7 @@ export default function Calendar() {
           items={items}
           now={now}
           onSlotClick={(d) => openForDate(d, true)}
-          onEventClick={setDetail}
+          handlers={handlers}
           onEventDrop={(id, slot) => void reschedule(id, slot, false)}
         />
       ) : total === 0 ? (
@@ -733,122 +744,6 @@ export default function Calendar() {
         </DialogContent>
       </Dialog>
 
-      {/* Event detail (clicked from Month/Week) */}
-      <Dialog open={detail !== null} onOpenChange={(o) => !o && setDetail(null)}>
-        <DialogContent className="sm:max-w-md">
-          {detail && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">
-                    {detail.round_name?.trim() || typeLabel(detail.interview_type)}
-                  </Badge>
-                  <span>
-                    {detail.company} — {detail.job_title}
-                  </span>
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-2 text-sm">
-                <p className="flex items-center gap-2 font-medium text-primary">
-                  <Clock className="h-4 w-4" />
-                  {relativeWhen(detail.scheduled_at, now)} · {detail.duration_min} min
-                </p>
-                {detail.location && (
-                  <p className="flex items-center gap-2 text-muted-foreground">
-                    <MapPin className="h-4 w-4 shrink-0" />
-                    <span className="break-all">{detail.location}</span>
-                  </p>
-                )}
-                {detail.status !== 'upcoming' && (
-                  <Badge variant="secondary" className="capitalize">
-                    {detail.status}
-                  </Badge>
-                )}
-                {detail.notes && <p className="text-muted-foreground">{detail.notes}</p>}
-              </div>
-              <div className="flex flex-wrap justify-end gap-2 pt-2">
-                {detail.status === 'upcoming' && (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const iv = detail
-                      setDetail(null)
-                      void launchInterviewSession(iv, navigate)
-                    }}
-                  >
-                    <Radio className="mr-1.5 h-4 w-4" /> Start live session
-                  </Button>
-                )}
-                {detail.session_id && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => navigate(`/report/${detail.session_id}`)}
-                  >
-                    <FileText className="mr-1.5 h-4 w-4" /> Report
-                  </Button>
-                )}
-                {detail.application_id && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => navigate(`/applications/${detail.application_id}`)}
-                  >
-                    <Briefcase className="mr-1.5 h-4 w-4" /> Job
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    const iv = detail
-                    setDetail(null)
-                    openEdit(iv)
-                  }}
-                >
-                  <Pencil className="mr-1.5 h-4 w-4" /> Edit
-                </Button>
-                {detail.status === 'upcoming' && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      void setStatus(detail.id, 'completed')
-                      setDetail(null)
-                    }}
-                  >
-                    <Check className="mr-1.5 h-4 w-4" /> Complete
-                  </Button>
-                )}
-                {detail.status === 'upcoming' && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      void setStatus(detail.id, 'cancelled')
-                      setDetail(null)
-                    }}
-                  >
-                    <X className="mr-1.5 h-4 w-4" /> Cancel
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    const removeId = detail.id
-                    setDetail(null)
-                    setDeleteId(removeId)
-                  }}
-                >
-                  <Trash2 className="mr-1.5 h-4 w-4" /> Delete
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
       {/* Day events (from "+N more" in Month view) */}
       <Dialog open={dayList !== null} onOpenChange={(o) => !o && setDayList(null)}>
         <DialogContent className="sm:max-w-md">
@@ -865,28 +760,25 @@ export default function Calendar() {
               </DialogHeader>
               <div className="space-y-1.5">
                 {eventsForDay(items, dayList).map((iv) => (
-                  <button
-                    key={iv.id}
-                    type="button"
-                    onClick={() => {
-                      setDayList(null)
-                      setDetail(iv)
-                    }}
-                    className="flex w-full items-center justify-between gap-2 rounded-md border p-2 text-left text-sm transition-colors hover:bg-accent/40"
-                  >
-                    <span className="min-w-0 truncate">
-                      <span className="tabular-nums text-primary">
-                        {new Date(iv.scheduled_at).toLocaleTimeString([], {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
-                      </span>{' '}
-                      {iv.company} — {iv.job_title}
-                    </span>
-                    <Badge variant="outline" className="shrink-0">
-                      {iv.round_name?.trim() || typeLabel(iv.interview_type)}
-                    </Badge>
-                  </button>
+                  <EventPopover key={iv.id} iv={iv} now={now} handlers={handlers}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2 rounded-md border p-2 text-left text-sm transition-colors hover:bg-accent/40"
+                    >
+                      <span className="min-w-0 truncate">
+                        <span className="tabular-nums text-primary">
+                          {new Date(iv.scheduled_at).toLocaleTimeString([], {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
+                        </span>{' '}
+                        {iv.company} — {iv.job_title}
+                      </span>
+                      <Badge variant="outline" className="shrink-0">
+                        {iv.round_name?.trim() || typeLabel(iv.interview_type)}
+                      </Badge>
+                    </button>
+                  </EventPopover>
                 ))}
               </div>
               <div className="flex justify-end">

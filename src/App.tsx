@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { Toaster } from '@/components/ui/sonner'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { useAppStore } from '@/store/app-store'
 import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
@@ -62,8 +63,9 @@ export default function App() {
   }, [theme])
 
   return (
-    <HashRouter>
-      <Routes>
+    <TooltipProvider delayDuration={300}>
+      <HashRouter>
+        <Routes>
         <Route path="/login" element={<Login />} />
         {/* Public legal pages — readable before sign-in. */}
         <Route path="/legal/terms" element={<Terms />} />
@@ -86,8 +88,9 @@ export default function App() {
             <Route path="/report/:id" element={<SessionReport />} />
           </Route>
         </Route>
-      </Routes>
-      <Toaster />
-    </HashRouter>
+        </Routes>
+        <Toaster />
+      </HashRouter>
+    </TooltipProvider>
   )
 }
