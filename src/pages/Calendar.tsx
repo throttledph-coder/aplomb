@@ -130,6 +130,7 @@ export default function Calendar() {
   const [draft, setDraft] = useState<DraftState | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [dayList, setDayList] = useState<Date | null>(null)
+  const [pendingEditId, setPendingEditId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(() => new Date())
   const [viewDate, setViewDate] = useState<Date>(() => new Date())
@@ -171,13 +172,30 @@ export default function Calendar() {
   // Deep link from "Schedule interview" (Application detail) → open the add
   // dialog prefilled, then clear the router state so it won't reopen on back.
   useEffect(() => {
-    const ni = (location.state as { newInterview?: Partial<DraftState> } | null)?.newInterview
-    if (ni) {
-      setDraft({ ...emptyDraft(), ...ni })
+    const state = location.state as
+      | { newInterview?: Partial<DraftState>; editInterview?: number }
+      | null
+    if (state?.newInterview) {
+      setDraft({ ...emptyDraft(), ...state.newInterview })
+      navigate('.', { replace: true, state: null })
+    } else if (state?.editInterview != null) {
+      setPendingEditId(state.editInterview)
       navigate('.', { replace: true, state: null })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Deep link from the dashboard checklist ("fix notes/JD") → open the edit
+  // dialog once the interviews have loaded.
+  useEffect(() => {
+    if (pendingEditId === null) return
+    const iv = items.find((i) => i.id === pendingEditId)
+    if (iv) {
+      setPendingEditId(null)
+      openEdit(iv)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, pendingEditId])
 
   // Keep countdowns fresh + re-bucket as time passes.
   useEffect(() => {
