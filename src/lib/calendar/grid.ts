@@ -70,6 +70,17 @@ export function minutesSinceMidnight(iso: string): number {
   return d.getHours() * 60 + d.getMinutes()
 }
 
+function pad(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
+// Local-time value for <input type="datetime-local"> (YYYY-MM-DDTHH:mm).
+export function toLocalInput(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
+    d.getMinutes(),
+  )}`
+}
+
 export function monthLabel(d: Date): string {
   return d.toLocaleDateString([], { month: 'long', year: 'numeric' })
 }

@@ -7,6 +7,7 @@ import {
   addMonths,
   eventsForDay,
   startOfWeek,
+  toLocalInput,
 } from './grid'
 import type { Interview } from '@/types'
 
@@ -83,6 +84,13 @@ describe('date math', () => {
     const s = startOfWeek(new Date(2026, 5, 10, 14, 30))
     expect(s.getDay()).toBe(0)
     expect(s.getHours()).toBe(0)
+  })
+})
+
+describe('toLocalInput', () => {
+  it('formats local datetime-local values with zero padding', () => {
+    expect(toLocalInput(new Date(2026, 0, 5, 9, 7))).toBe('2026-01-05T09:07')
+    expect(toLocalInput(new Date(2026, 11, 25, 23, 59))).toBe('2026-12-25T23:59')
   })
 })
 
