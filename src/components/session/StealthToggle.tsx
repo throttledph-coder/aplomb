@@ -21,9 +21,16 @@ export function StealthToggle() {
   }
 
   return (
-    <Button size="sm" variant={active ? 'default' : 'outline'} onClick={() => void toggle()}>
-      {active ? <EyeOff className="mr-1.5 h-3.5 w-3.5" /> : <Eye className="mr-1.5 h-3.5 w-3.5" />}
-      Stealth {active ? 'ON' : 'OFF'}
+    <Button
+      size="icon"
+      variant={active ? 'default' : 'outline'}
+      className="h-8 w-8"
+      onClick={() => void toggle()}
+      title={active ? 'Stealth on — hidden from screen share' : 'Stealth off — visible to screen share'}
+      aria-label={active ? 'Disable stealth mode' : 'Enable stealth mode'}
+      aria-pressed={active}
+    >
+      {active ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
     </Button>
   )
 }
