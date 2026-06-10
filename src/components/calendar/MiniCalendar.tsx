@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Radio, ArrowUpRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Radio, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
   PopoverClose,
 } from '@/components/ui/popover'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { addMonths, eventsForDay, monthLabel, monthMatrix, sameDay } from '@/lib/calendar/grid'
 import { cn } from '@/lib/utils'
 import type { Interview } from '@/types'
@@ -82,7 +84,52 @@ export function MiniCalendar({
 
     return (
       <Popover key={day.getTime()}>
-        <PopoverTrigger asChild>{button}</PopoverTrigger>
+        {/* Hover = read-only schedule/notes preview; click = the action popover. */}
+        <HoverCard openDelay={150} closeDelay={100}>
+          <HoverCardTrigger asChild>
+            <PopoverTrigger asChild>{button}</PopoverTrigger>
+          </HoverCardTrigger>
+          <HoverCardContent align="center" side="left" className="w-64 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {dayHeading(day)}
+            </p>
+            <div className="mt-2 space-y-2.5">
+              {events.map((iv) => (
+                <div key={iv.id} className="min-w-0">
+                  <p
+                    className={cn(
+                      'truncate text-sm font-medium',
+                      iv.status === 'cancelled' && 'text-muted-foreground line-through',
+                    )}
+                  >
+                    <span className="tabular-nums text-primary">{timeLabel(iv.scheduled_at)}</span>{' '}
+                    {iv.company} — {iv.job_title}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <Badge variant="outline" className="px-1.5 py-0 text-[10px] capitalize">
+                      {iv.round_name?.trim() || iv.interview_type.replace('_', ' ')}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">{iv.duration_min} min</span>
+                  </div>
+                  {iv.location && (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{iv.location}</span>
+                    </p>
+                  )}
+                  {iv.notes?.trim() && (
+                    <p className="mt-1 line-clamp-2 text-xs italic text-muted-foreground">
+                      {iv.notes}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 border-t pt-1.5 text-[10px] text-muted-foreground/70">
+              Click the date for actions
+            </p>
+          </HoverCardContent>
+        </HoverCard>
         <PopoverContent align="center" className="w-64 p-3">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {dayHeading(day)}
@@ -120,15 +167,10 @@ export function MiniCalendar({
               </div>
             ))}
           </div>
-          <div className="mt-2.5 flex gap-1 border-t pt-2">
+          <div className="mt-2.5 border-t pt-2">
             <PopoverClose asChild>
-              <Button size="sm" variant="ghost" className="flex-1" onClick={() => onSchedule(day)}>
+              <Button size="sm" variant="ghost" className="w-full" onClick={() => onSchedule(day)}>
                 <Plus className="mr-1 h-3.5 w-3.5" /> Add
-              </Button>
-            </PopoverClose>
-            <PopoverClose asChild>
-              <Button size="sm" variant="ghost" className="flex-1" onClick={onOpen}>
-                <ArrowUpRight className="mr-1 h-3.5 w-3.5" /> Calendar
               </Button>
             </PopoverClose>
           </div>
