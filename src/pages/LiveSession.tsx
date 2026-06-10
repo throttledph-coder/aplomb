@@ -7,12 +7,10 @@ import {
   RefreshCw,
   Mic,
   Send,
-  Check,
   Pencil,
   X,
   Merge,
   Square,
-  HelpCircle,
   Zap,
   Type,
   Maximize2,
@@ -37,8 +35,10 @@ import { StealthToggle } from '@/components/session/StealthToggle'
 import { AudioBars } from '@/components/session/AudioBars'
 import { ModelPicker } from '@/components/session/ModelPicker'
 import { Markdown, type MarkdownSize } from '@/components/report/Markdown'
-import { scoreAnswer, FLAG_TIPS } from '@/lib/eval/answer-scorer'
-import type { AnswerLength } from '@/lib/providers/types'
+// Quiet h-6 icon button used across the composer bar, bubble actions, and
+// Heard-card secondaries — one consistent affordance.
+const ICON_BTN =
+  'flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground'
 
 function ChatTurn({
   question,
@@ -46,12 +46,14 @@ function ChatTurn({
   streaming,
   size = 'sm',
   latest = true,
+  actions,
 }: {
   question: string
   answer: string
   streaming?: boolean
   size?: MarkdownSize
   latest?: boolean
+  actions?: ReactNode
 }) {
   return (
     <div className={cn('space-y-2 transition-opacity', !latest && 'opacity-60')}>
@@ -61,7 +63,8 @@ function ChatTurn({
         </div>
       </div>
       <div className="flex justify-start">
-        <div className="max-w-[95%] rounded-2xl rounded-bl-sm border bg-card px-4 py-3 leading-relaxed">
+        {/* 68ch cap keeps lines glance-readable even at lg/xl answer sizes. */}
+        <div className="max-w-[min(95%,68ch)] rounded-2xl rounded-bl-sm border bg-card px-4 py-3 leading-relaxed">
           {answer ? (
             <Markdown text={answer} size={size} tone="normal" />
           ) : streaming ? (
@@ -71,6 +74,7 @@ function ChatTurn({
               <span className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground/60 [animation-delay:300ms]" />
             </span>
           ) : null}
+          {actions && <div className="-mb-1 mt-2 flex justify-end gap-0.5">{actions}</div>}
         </div>
       </div>
     </div>
@@ -165,8 +169,8 @@ function Composer({
   )
 }
 
-// A detected interviewer question, shown as a pending right-side bubble with
-// Use / Edit / Ignore (+ Combine when it can merge into the bubble above).
+// A detected interviewer question. The bubble itself is the primary action —
+// tap to answer it; Edit / Combine / Ignore are quiet icon secondaries.
 function PendingBubble({
   text,
   canCombine,
@@ -184,27 +188,33 @@ function PendingBubble({
 }) {
   return (
     <div className="flex flex-col items-end gap-1">
-      <div className="max-w-[80%] rounded-2xl rounded-br-sm border border-dashed border-primary/60 bg-primary/10 px-3.5 py-2 text-sm">
+      <button
+        onClick={onUse}
+        title="Answer this question"
+        className="max-w-[80%] rounded-2xl rounded-br-sm border border-dashed border-primary/60 bg-primary/10 px-3.5 py-2 text-left text-sm transition-colors hover:border-primary hover:bg-primary/20"
+      >
         <span className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          Heard
+          Heard — tap to answer
         </span>
         {text}
-      </div>
-      <div className="flex flex-wrap justify-end gap-1">
-        <Button size="sm" className="h-7" onClick={onUse}>
-          <Check className="mr-1 h-3.5 w-3.5" /> Use this question
-        </Button>
-        <Button size="sm" variant="outline" className="h-7" onClick={onEdit}>
-          <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
-        </Button>
+      </button>
+      <div className="flex justify-end gap-0.5">
+        <button title="Edit before asking" aria-label="Edit question" onClick={onEdit} className={ICON_BTN}>
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
         {canCombine && (
-          <Button size="sm" variant="outline" className="h-7" onClick={onCombine}>
-            <Merge className="mr-1 h-3.5 w-3.5" /> Combine
-          </Button>
+          <button
+            title="Combine with the heard question above"
+            aria-label="Combine questions"
+            onClick={onCombine}
+            className={ICON_BTN}
+          >
+            <Merge className="h-3.5 w-3.5" />
+          </button>
         )}
-        <Button size="sm" variant="ghost" className="h-7" onClick={onIgnore}>
-          <X className="mr-1 h-3.5 w-3.5" /> Ignore
-        </Button>
+        <button title="Ignore" aria-label="Ignore question" onClick={onIgnore} className={ICON_BTN}>
+          <X className="h-3.5 w-3.5" />
+        </button>
       </div>
     </div>
   )
@@ -248,8 +258,17 @@ export default function LiveSession() {
     isBusy: isGenerating,
   })
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  // True while the user is at (or near) the bottom — streaming only follows then.
+  const pinnedRef = useRef(true)
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const [composerInput, setComposerInput] = useState('')
+
+  function onTranscriptScroll() {
+    const el = scrollRef.current
+    if (!el) return
+    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+  }
 
   // Auto-answer toggle: persist the flag; turning it on while idle also starts
   // listening (it's only meaningful with audio coming in).
@@ -315,20 +334,10 @@ export default function LiveSession() {
   const showingLive = isGenerating || currentAnswer.length > 0
   const last = qaHistory[qaHistory.length - 1]
 
-  // Advisory quality tips for the latest answer (pure, no model).
-  const answerLength = (settings.answer_length as AnswerLength) ?? 'detailed'
-  const lastTips =
-    !isGenerating && last
-      ? scoreAnswer(last.answer, {
-          question: last.question,
-          length: answerLength,
-          jd: session?.job_description,
-        }).flags.map((f) => FLAG_TIPS[f])
-      : []
-
-  // Auto-scroll transcript to the newest content.
+  // Follow the newest content only while the user is pinned to the bottom —
+  // scrolling up to re-read mid-stream must not get yanked back down.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (pinnedRef.current) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [qaHistory.length, currentAnswer, isGenerating, auto.pending.length])
 
   if (!session) {
@@ -345,6 +354,28 @@ export default function LiveSession() {
 
   const empty = qaHistory.length === 0 && !showingLive && auto.pending.length === 0
 
+  // In-bubble actions for the latest finished answer (no layout shift below).
+  const lastActions = (
+    <>
+      <button
+        title="Copy answer"
+        aria-label="Copy answer"
+        onClick={() => void copyLast()}
+        className={ICON_BTN}
+      >
+        <Copy className="h-3.5 w-3.5" />
+      </button>
+      <button
+        title="Regenerate answer"
+        aria-label="Regenerate answer"
+        onClick={() => void regenerateAnswer()}
+        className={ICON_BTN}
+      >
+        <RefreshCw className="h-3.5 w-3.5" />
+      </button>
+    </>
+  )
+
   return (
     <div className="flex h-[calc(100vh-3rem)] flex-col gap-3">
       <SessionHeader
@@ -355,17 +386,18 @@ export default function LiveSession() {
           <>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
+              className="h-8 w-8"
               onClick={() => setZenMode(!zenMode)}
               title={zenMode ? 'Exit reading mode (Esc)' : 'Reading mode — focus on the answer'}
+              aria-label={zenMode ? 'Exit reading mode' : 'Reading mode'}
               aria-pressed={zenMode}
             >
               {zenMode ? (
-                <Minimize2 className="mr-1.5 h-3.5 w-3.5" />
+                <Minimize2 className="h-3.5 w-3.5" />
               ) : (
-                <Maximize2 className="mr-1.5 h-3.5 w-3.5" />
+                <Maximize2 className="h-3.5 w-3.5" />
               )}
-              {zenMode ? 'Exit' : 'Focus'}
             </Button>
             {canStealth && <StealthToggle />}
           </>
@@ -374,11 +406,13 @@ export default function LiveSession() {
 
       {/* Conversation transcript (only this scrolls) */}
       <div
+        ref={scrollRef}
+        onScroll={onTranscriptScroll}
         role="log"
         aria-live="polite"
         aria-atomic="false"
         aria-label="Interview conversation"
-        className="flex-1 overflow-y-auto rounded-lg border bg-background/40 p-4"
+        className="flex-1 overflow-y-auto px-1"
       >
         {empty ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
@@ -391,7 +425,13 @@ export default function LiveSession() {
             {showingLive ? (
               <ChatTurn question={currentQuestion} answer={currentAnswer} streaming size="xl" latest />
             ) : last ? (
-              <ChatTurn question={last.question} answer={last.answer} size="xl" latest />
+              <ChatTurn
+                question={last.question}
+                answer={last.answer}
+                size="xl"
+                latest
+                actions={lastActions}
+              />
             ) : null}
             <div ref={bottomRef} />
           </div>
@@ -404,6 +444,9 @@ export default function LiveSession() {
                 answer={qa.answer}
                 size={answerSize}
                 latest={!showingLive && i === qaHistory.length - 1}
+                actions={
+                  !isGenerating && i === qaHistory.length - 1 ? lastActions : undefined
+                }
               />
             ))}
             {showingLive && (
@@ -414,21 +457,6 @@ export default function LiveSession() {
                 size={answerSize}
                 latest
               />
-            )}
-            {!isGenerating && last && (
-              <div className="space-y-1 pl-1">
-                <div className="flex gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => void copyLast()}>
-                    <Copy className="mr-1 h-3.5 w-3.5" /> Copy
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => void regenerateAnswer()}>
-                    <RefreshCw className="mr-1 h-3.5 w-3.5" /> Regenerate
-                  </Button>
-                </div>
-                {lastTips.length > 0 && (
-                  <p className="text-xs text-muted-foreground">Tips: {lastTips.join(' · ')}</p>
-                )}
-              </div>
             )}
             {/* Detected (heard) questions awaiting the user's decision. */}
             {auto.pending.map((p, i) => (
@@ -468,13 +496,12 @@ export default function LiveSession() {
               {/* Answer text size — cycle base → lg → xl for at-a-glance reading. */}
               <button
                 type="button"
-                title={`Answer text size: ${answerSize} (tap to enlarge)`}
+                title={`Answer text size: ${answerSize} — tap to cycle`}
                 aria-label="Cycle answer text size"
                 onClick={cycleAnswerSize}
-                className="flex h-6 items-center justify-center gap-0.5 rounded-md px-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className={ICON_BTN}
               >
                 <Type className="h-3.5 w-3.5" />
-                <span className="text-[10px] font-semibold uppercase">{answerSize}</span>
               </button>
               {canAutoListen && (
                 <>
@@ -512,20 +539,13 @@ export default function LiveSession() {
                   >
                     <Zap className="h-3.5 w-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    title="How auto-listen works"
-                    aria-label="Auto-listen help"
-                    onClick={() => setHelpOpen(true)}
-                    className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  >
-                    <HelpCircle className="h-3.5 w-3.5" />
-                  </button>
                 </>
               )}
             </div>
           }
-          rightControls={<ModelPicker />}
+          rightControls={
+            <ModelPicker onHelp={canAutoListen ? () => setHelpOpen(true) : undefined} />
+          }
         />
         <p className="text-center text-[11px] text-muted-foreground">
           Aplomb can be wrong — skim before you speak.
