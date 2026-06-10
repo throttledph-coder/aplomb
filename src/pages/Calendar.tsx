@@ -42,7 +42,14 @@ import {
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/app-store'
 import { groupByWhen, relativeWhen } from '@/lib/calendar/grouping'
-import { addMonths, addWeeks, eventsForDay, monthLabel, weekRangeLabel } from '@/lib/calendar/grid'
+import {
+  addMonths,
+  addWeeks,
+  eventsForDay,
+  monthLabel,
+  toLocalInput,
+  weekRangeLabel,
+} from '@/lib/calendar/grid'
 import { launchInterviewSession } from '@/lib/calendar/launch'
 import { MonthView } from '@/components/calendar/MonthView'
 import { WeekView } from '@/components/calendar/WeekView'
@@ -85,16 +92,6 @@ interface DraftState {
   additional_info: string
   remind_day_of: boolean
   remind_mins_before: number
-}
-
-function pad(n: number): string {
-  return String(n).padStart(2, '0')
-}
-
-function toLocalInput(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
-    d.getMinutes(),
-  )}`
 }
 
 function defaultWhen(): string {

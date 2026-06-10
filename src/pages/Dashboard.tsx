@@ -27,7 +27,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useAppStore } from '@/store/app-store'
 import { scoreAnswer } from '@/lib/eval/answer-scorer'
 import { relativeWhen } from '@/lib/calendar/grouping'
+import { toLocalInput } from '@/lib/calendar/grid'
 import { launchInterviewSession } from '@/lib/calendar/launch'
+import { MiniCalendar } from '@/components/calendar/MiniCalendar'
 import { summarize, type DashboardSummary } from '@/lib/dashboard/summary'
 import {
   APPLICATION_STATUSES,
@@ -140,8 +142,8 @@ export default function Dashboard() {
 
   const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [resumes, setResumes] = useState<Resume[]>([])
-  const [nextInterview, setNextInterview] = useState<Interview | null>(null)
-  const [upcomingMore, setUpcomingMore] = useState<Interview[]>([])
+  const [interviews, setInterviews] = useState<Interview[]>([])
+  const [upcoming, setUpcoming] = useState<Interview[]>([])
   const [questionCount, setQuestionCount] = useState(0)
   const [avgPct, setAvgPct] = useState<number | null>(null)
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
@@ -162,12 +164,13 @@ export default function Dashboard() {
     setSessions(s)
     setResumes(r)
 
+    setInterviews(interviews)
     const nowMs = Date.now()
-    const upcoming = interviews.filter(
-      (i) => i.status === 'upcoming' && new Date(i.scheduled_at).getTime() >= nowMs,
+    setUpcoming(
+      interviews.filter(
+        (i) => i.status === 'upcoming' && new Date(i.scheduled_at).getTime() >= nowMs,
+      ),
     )
-    setNextInterview(upcoming[0] ?? null)
-    setUpcomingMore(upcoming.slice(1, 3))
 
     const length = (useAppStore.getState().settings.answer_length ?? 'detailed') as AnswerLength
     const qaLists = await Promise.all(s.map((x) => window.db.qa.list(x.id)))
@@ -211,6 +214,8 @@ export default function Dashboard() {
     toast.success('Resume deleted.')
   }
 
+  const nextInterview = upcoming[0] ?? null
+  const upcomingMore = upcoming.slice(1, 3)
   const nextResume = nextInterview?.resume_id
     ? resumes.find((r) => r.id === nextInterview.resume_id)
     : undefined
@@ -218,15 +223,20 @@ export default function Dashboard() {
   return (
     <div className="space-y-10">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-light tracking-tight">
-          {greeting()}
-          {firstName ? `, ${firstName}` : ''}.
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {plan === 'premium'
-            ? 'Premium — unlimited prep plus live auto-listen & stealth.'
-            : 'Free — unlimited prep. Upgrade to Pro for live auto-listen & stealth.'}
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-light tracking-tight">
+            {greeting()}
+            {firstName ? `, ${firstName}` : ''}.
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {plan === 'premium'
+              ? 'Premium — unlimited prep plus live auto-listen & stealth.'
+              : 'Free — unlimited prep. Upgrade to Pro for live auto-listen & stealth.'}
+          </p>
+        </div>
+        <p className="hidden shrink-0 text-sm text-muted-foreground sm:block">
+          {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
       </div>
 
@@ -303,6 +313,10 @@ export default function Dashboard() {
           )}
         </div>
       ) : null}
+
+      {/* Command-center grid: work on the left, time + pipeline rail on the right */}
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-w-0 space-y-10">
 
       {/* Focus block — the only emphasized surface; holds the two primary CTAs */}
       {loading ? (
@@ -505,6 +519,150 @@ export default function Dashboard() {
           </div>
         )}
       </section>
+        </div>
+
+        {/* Right rail — calendar, week ahead, application pipeline */}
+        <aside className="min-w-0 space-y-8">
+          <section>
+            <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Calendar
+            </h2>
+            {loading ? (
+              <Skeleton className="h-64" />
+            ) : (
+              <div className="rounded-lg border bg-card p-3">
+                <MiniCalendar
+                  items={interviews}
+                  now={new Date()}
+                  onLaunch={(iv) => void launchInterviewSession(iv, navigate)}
+                  onSchedule={(day) => {
+                    const d = new Date(day)
+                    d.setHours(10, 0, 0, 0)
+                    navigate('/calendar', {
+                      state: { newInterview: { scheduled_at: toLocalInput(d) } },
+                    })
+                  }}
+                  onOpen={() => navigate('/calendar')}
+                />
+              </div>
+            )}
+          </section>
+
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Upcoming
+              </h2>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => navigate('/calendar')}
+                    className="text-muted-foreground/60 transition-colors hover:text-foreground"
+                    aria-label="Schedule interview"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Schedule interview</TooltipContent>
+              </Tooltip>
+            </div>
+            {loading ? (
+              <Skeleton className="h-24" />
+            ) : upcoming.length === 0 ? (
+              <p className="py-1 text-sm text-muted-foreground">Nothing scheduled.</p>
+            ) : (
+              <div className="divide-y divide-border">
+                {upcoming.slice(0, 4).map((iv) => (
+                  <div key={iv.id} className="group flex items-center gap-2 py-2.5">
+                    <button
+                      onClick={() => navigate('/calendar')}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <p className="truncate text-sm font-medium">
+                        {iv.company} — {iv.job_title}
+                      </p>
+                      <p className="truncate text-xs">
+                        <span className="font-medium text-primary">
+                          {relativeWhen(iv.scheduled_at, new Date())}
+                        </span>
+                        <span className="capitalize text-muted-foreground">
+                          {' '}· {iv.round_name?.trim() || iv.interview_type.replace('_', ' ')}
+                        </span>
+                      </p>
+                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0 text-primary opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                          onClick={() => void launchInterviewSession(iv, navigate)}
+                          aria-label={`Start live session for ${iv.company}`}
+                        >
+                          <Radio className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Start live session</TooltipContent>
+                    </Tooltip>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {!loading && summary && summary.totalApps > 0 && (
+            <section>
+              <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Pipeline
+              </h2>
+              <button
+                onClick={() => navigate('/applications')}
+                className="group block w-full text-left"
+                aria-label="View applications"
+              >
+                <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  {APPLICATION_STATUSES.filter((s) => summary.appsByStatus[s.value] > 0).map(
+                    (s) => (
+                      <div
+                        key={s.value}
+                        className={APPLICATION_STATUS_COLORS[s.value]
+                          .split(' ')
+                          .find((c) => c.startsWith('bg-'))}
+                        style={{
+                          width: `${(summary.appsByStatus[s.value] / summary.totalApps) * 100}%`,
+                        }}
+                      />
+                    ),
+                  )}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                  {APPLICATION_STATUSES.filter((s) => summary.appsByStatus[s.value] > 0).map(
+                    (s) => (
+                      <span
+                        key={s.value}
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                      >
+                        <span
+                          className={cn(
+                            'h-1.5 w-1.5 rounded-full',
+                            APPLICATION_STATUS_COLORS[s.value]
+                              .split(' ')
+                              .find((c) => c.startsWith('bg-')),
+                          )}
+                        />
+                        {s.label}{' '}
+                        <span className="tabular-nums text-foreground">
+                          {summary.appsByStatus[s.value]}
+                        </span>
+                      </span>
+                    ),
+                  )}
+                </div>
+              </button>
+            </section>
+          )}
+        </aside>
+      </div>
 
       {/* Resume delete confirm */}
       <Dialog open={deleteResume !== null} onOpenChange={(o) => !o && setDeleteResume(null)}>
