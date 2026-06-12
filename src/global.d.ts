@@ -1,5 +1,6 @@
 import type {
   Application,
+  ExtractedJob,
   Interview,
   InterviewSession,
   KeywordMatches,
@@ -67,6 +68,7 @@ export interface ClarityAiApi {
   analyzeFit(input: ApplyInput): Promise<string>
   draftCoverLetter(input: ApplyInput): Promise<string>
   structureResume(rawText: string): Promise<ParsedResumeData>
+  extractJob(postingText: string): Promise<ExtractedJob>
 }
 
 export interface ApplyInput {
@@ -130,6 +132,7 @@ export interface ClarityDbApi {
       job_description?: string | null
     }): Promise<Application>
     list(): Promise<Application[]>
+    listWithActions(): Promise<Application[]>
     update(id: number, patch: UpdateApplication): Promise<Application | null>
     delete(id: number): Promise<void>
   }
@@ -168,6 +171,7 @@ export interface ClarityAppApi {
   openLogs(): Promise<void>
   // Subscribe to reminder-toast clicks; returns an unsubscribe fn.
   onInterviewNavigate(cb: (id: number) => void): () => void
+  onApplicationNavigate(cb: (id: number) => void): () => void
 }
 
 export interface UpdaterEvent {

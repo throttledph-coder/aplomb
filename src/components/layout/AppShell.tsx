@@ -16,6 +16,12 @@ export function AppShell() {
     return window.app.onInterviewNavigate(() => navigate('/calendar'))
   }, [navigate])
 
+  // Clicking a follow-up toast opens that application.
+  useEffect(() => {
+    if (!window.app?.onApplicationNavigate) return
+    return window.app.onApplicationNavigate((id) => navigate(`/applications/${id}`))
+  }, [navigate])
+
   // Surface app updates globally (the launch auto-check fires before Account mounts).
   useEffect(() => {
     if (!window.updater?.onEvent) return

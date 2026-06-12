@@ -12,6 +12,7 @@ import {
   Target,
   Lightbulb,
   ArrowRight,
+  AlarmClock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -43,6 +44,7 @@ import {
   APPLICATION_STATUSES,
   APPLICATION_STATUS_COLORS,
 } from '@/lib/applications/status'
+import { suggestNextAction, isStale, daysSinceActivity } from '@/lib/applications/actions'
 import { cn } from '@/lib/utils'
 import type { AnswerLength } from '@/lib/providers/types'
 import type { Application, Interview, InterviewSession, InterviewType, Resume } from '@/types'
@@ -237,6 +239,22 @@ export default function Dashboard() {
 
   const activity = recentActivity(sessions, interviews, apps)
   const todayEvents = eventsForDay(interviews, now)
+
+  // Action queue: due/overdue next actions first (by due time), then stale
+  // applications that need a nudge. The tracker tells you what to do next.
+  const actionQueue = apps
+    .filter((a) => a.status !== 'rejected')
+    .map((a) => {
+      const suggestion = suggestNextAction(a, interviews, now)
+      const due = suggestion !== null && suggestion.due.getTime() <= now.getTime()
+      return { app: a, suggestion, due, stale: isStale(a, now) }
+    })
+    .filter((x) => x.due || x.stale)
+    .sort((a, b) => {
+      if (a.due !== b.due) return a.due ? -1 : 1
+      return (a.suggestion?.due.getTime() ?? 0) - (b.suggestion?.due.getTime() ?? 0)
+    })
+    .slice(0, 5)
 
   // Real preparation state for the next interview — no fake checkmarks.
   const prepDone =
@@ -465,6 +483,38 @@ export default function Dashboard() {
                 </Button>
               </div>
             </div>
+          )}
+
+          {/* Action queue — what needs your attention right now */}
+          {!loading && actionQueue.length > 0 && (
+            <section>
+              <h2 className={cn(sectionTitle, 'mb-2')}>Action queue</h2>
+              <div className="divide-y divide-border">
+                {actionQueue.map(({ app: a, suggestion, due }) => (
+                  <button
+                    key={a.id}
+                    onClick={() => navigate(`/applications/${a.id}`)}
+                    className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50"
+                  >
+                    <AlarmClock
+                      className={cn(
+                        'h-4 w-4 shrink-0',
+                        due ? 'text-primary' : 'text-muted-foreground',
+                      )}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">
+                        {due && suggestion ? suggestion.action : 'Nudge this application'} —{' '}
+                        {a.company}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {due ? a.job_title : `No movement in ${daysSinceActivity(a, now)} days`}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
           )}
 
           {/* Stat cards */}

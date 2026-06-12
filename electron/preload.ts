@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('db', {
     get: (id: number) => invoke('db:application:get', id),
     upsertForJob: (input: unknown) => invoke('db:application:upsertForJob', input),
     list: () => invoke('db:application:list'),
+    listWithActions: () => invoke('db:application:listWithActions'),
     update: (id: number, patch: unknown) => invoke('db:application:update', id, patch),
     delete: (id: number) => invoke('db:application:delete', id),
   },
@@ -81,6 +82,7 @@ contextBridge.exposeInMainWorld('ai', {
   analyzeFit: (input: unknown) => invoke('ai:analyzeFit', input),
   draftCoverLetter: (input: unknown) => invoke('ai:draftCoverLetter', input),
   structureResume: (rawText: string) => invoke('ai:structureResume', rawText),
+  extractJob: (postingText: string) => invoke('ai:extractJob', postingText),
   cancelStream: () => invoke('ai:cancelStream'),
   streamAnswer: (input: unknown, onToken: (token: string) => void) => {
     const id = crypto.randomUUID()
@@ -111,6 +113,12 @@ contextBridge.exposeInMainWorld('app', {
     const listener = (_e: unknown, id: number) => cb(id)
     ipcRenderer.on('interview:navigate', listener)
     return () => ipcRenderer.off('interview:navigate', listener)
+  },
+  // Fired when the user clicks a follow-up toast for a tracked application.
+  onApplicationNavigate: (cb: (id: number) => void) => {
+    const listener = (_e: unknown, id: number) => cb(id)
+    ipcRenderer.on('application:navigate', listener)
+    return () => ipcRenderer.off('application:navigate', listener)
   },
 })
 

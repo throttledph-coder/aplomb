@@ -286,6 +286,8 @@ export function createSession(input: NewInterviewSession): InterviewSession {
       parsed_jd: input.parsed_jd ? json(input.parsed_jd) : null,
       additional_info: input.additional_info ?? null,
     })
+  // A prep/live session for a tracked job counts as activity on it.
+  if (input.application_id != null) touchApplicationActivity(input.application_id)
   return getSession(Number(info.lastInsertRowid))!
 }
 
@@ -538,12 +540,25 @@ interface RawApplication {
   notes: string | null
   session_id: number | null
   applied_at: string | null
+  salary_range: string | null
+  location: string | null
+  source: string | null
+  deadline: string | null
+  excitement: number | null
+  next_action: string | null
+  next_action_at: string | null
+  last_activity_at: string | null
+  notified_action: number
   created_at: string
   updated_at: string
 }
 
 function mapApplication(r: RawApplication): Application {
-  return { ...r, status: r.status as ApplicationStatus }
+  return {
+    ...r,
+    status: r.status as ApplicationStatus,
+    notified_action: !!r.notified_action,
+  }
 }
 
 export function createApplication(input: NewApplication): Application {
@@ -551,9 +566,13 @@ export function createApplication(input: NewApplication): Application {
   const info = db
     .prepare(
       `INSERT INTO applications
-         (company, job_title, job_url, status, job_description, notes, session_id, applied_at)
+         (company, job_title, job_url, status, job_description, notes, session_id, applied_at,
+          salary_range, location, source, deadline, excitement, next_action, next_action_at,
+          last_activity_at)
        VALUES
-         (@company, @job_title, @job_url, @status, @job_description, @notes, @session_id, @applied_at)`,
+         (@company, @job_title, @job_url, @status, @job_description, @notes, @session_id, @applied_at,
+          @salary_range, @location, @source, @deadline, @excitement, @next_action, @next_action_at,
+          datetime('now'))`,
     )
     .run({
       company: input.company,
@@ -564,8 +583,26 @@ export function createApplication(input: NewApplication): Application {
       notes: input.notes ?? null,
       session_id: input.session_id ?? null,
       applied_at: input.applied_at ?? null,
+      salary_range: input.salary_range ?? null,
+      location: input.location ?? null,
+      source: input.source ?? null,
+      deadline: input.deadline ?? null,
+      excitement: input.excitement ?? null,
+      next_action: input.next_action ?? null,
+      next_action_at: input.next_action_at ?? null,
     })
   return getApplication(Number(info.lastInsertRowid))!
+}
+
+// Mark meaningful movement on an application (session started, interview round
+// changed, status edits) so the staleness rules in lib/applications/actions.ts
+// have a trustworthy clock.
+export function touchApplicationActivity(id: number): void {
+  getDb()
+    .prepare(
+      "UPDATE applications SET last_activity_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+    )
+    .run(id)
 }
 
 export function getApplication(id: number): Application | null {
@@ -596,11 +633,41 @@ export function updateApplication(id: number, patch: UpdateApplication): Applica
   if (patch.job_description !== undefined) set('job_description', patch.job_description)
   if (patch.notes !== undefined) set('notes', patch.notes)
   if (patch.applied_at !== undefined) set('applied_at', patch.applied_at)
+  if (patch.salary_range !== undefined) set('salary_range', patch.salary_range)
+  if (patch.location !== undefined) set('location', patch.location)
+  if (patch.source !== undefined) set('source', patch.source)
+  if (patch.deadline !== undefined) set('deadline', patch.deadline)
+  if (patch.excitement !== undefined) set('excitement', patch.excitement)
+  if (patch.next_action !== undefined) set('next_action', patch.next_action)
+  if (patch.next_action_at !== undefined) {
+    set('next_action_at', patch.next_action_at)
+    // A new due time means the old notification no longer applies.
+    sets.push('notified_action = 0')
+  }
   if (sets.length > 0) {
+    // Real movement (not planning fields) refreshes the staleness clock.
+    const activity =
+      patch.status !== undefined ||
+      patch.notes !== undefined ||
+      patch.applied_at !== undefined ||
+      patch.job_description !== undefined
+    if (activity) sets.push("last_activity_at = datetime('now')")
     sets.push("updated_at = datetime('now')")
     getDb().prepare(`UPDATE applications SET ${sets.join(', ')} WHERE id = @id`).run(params)
   }
   return getApplication(id)
+}
+
+// Active applications for the action engine (Home queue + reminder scheduler).
+export function listApplicationsWithActions(): Application[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM applications WHERE status != 'rejected' ORDER BY created_at DESC")
+    .all() as RawApplication[]
+  return rows.map(mapApplication)
+}
+
+export function markApplicationActionNotified(id: number): void {
+  getDb().prepare('UPDATE applications SET notified_action = 1 WHERE id = ?').run(id)
 }
 
 export function deleteApplication(id: number): void {
@@ -622,7 +689,10 @@ export function upsertApplicationForJob(input: {
     const bumped = nextStatus(existing.status)
     if (bumped !== existing.status) patch.status = bumped
     if (!existing.job_description && input.job_description) patch.job_description = input.job_description
-    return Object.keys(patch).length > 0 ? updateApplication(existing.id, patch)! : existing
+    if (Object.keys(patch).length > 0) return updateApplication(existing.id, patch)!
+    // No field change, but starting a session for this job is still activity.
+    touchApplicationActivity(existing.id)
+    return getApplication(existing.id)!
   }
   return createApplication({
     company: input.company,
@@ -700,6 +770,8 @@ export function createInterview(input: NewInterview): Interview {
       remind_day_of: bit(input.remind_day_of ?? true),
       remind_mins_before: input.remind_mins_before ?? null,
     })
+  // Scheduling a round for a tracked job counts as activity on it.
+  if (input.application_id != null) touchApplicationActivity(input.application_id)
   return getInterview(Number(info.lastInsertRowid))!
 }
 
@@ -755,6 +827,11 @@ export function updateInterview(id: number, patch: UpdateInterview): Interview |
     getDb()
       .prepare(`UPDATE interviews SET ${sets.join(', ')} WHERE id = @id`)
       .run(params)
+    // A round outcome (completed/cancelled/rescheduled) is activity on the job.
+    if (patch.status !== undefined || patch.scheduled_at !== undefined) {
+      const iv = getInterview(id)
+      if (iv?.application_id != null) touchApplicationActivity(iv.application_id)
+    }
   }
   return getInterview(id)
 }
