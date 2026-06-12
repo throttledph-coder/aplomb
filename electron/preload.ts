@@ -120,6 +120,21 @@ contextBridge.exposeInMainWorld('app', {
     ipcRenderer.on('application:navigate', listener)
     return () => ipcRenderer.off('application:navigate', listener)
   },
+  // Fired in the main window when the Focus overlay closes (refresh session UI).
+  onSessionRefresh: (cb: () => void) => {
+    const listener = () => cb()
+    ipcRenderer.on('session:refresh', listener)
+    return () => ipcRenderer.off('session:refresh', listener)
+  },
+})
+
+// --------- Focus overlay (stealth surface) ---------
+contextBridge.exposeInMainWorld('overlay', {
+  open: () => invoke('overlay:open'),
+  close: () => invoke('overlay:close'),
+  isOpen: () => invoke('overlay:isOpen'),
+  setOpacity: (value: number) => invoke('overlay:setOpacity', value),
+  setAlwaysOnTop: (on: boolean) => invoke('overlay:setAlwaysOnTop', on),
 })
 
 // --------- In-app updates (electron-updater) ---------

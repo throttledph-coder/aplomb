@@ -14,7 +14,6 @@ import {
   Zap,
   Type,
   Maximize2,
-  Minimize2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -227,8 +226,6 @@ export default function LiveSession() {
   const plan = useAppStore((s) => s.plan)
   const settings = useAppStore((s) => s.settings)
   const updateSetting = useAppStore((s) => s.updateSetting)
-  const zenMode = useAppStore((s) => s.zenMode)
-  const setZenMode = useAppStore((s) => s.setZenMode)
   const canAutoListen = checkFeatureAccess('autoListenEnabled', plan)
   const canStealth = checkFeatureAccess('stealthModeEnabled', plan)
   const [helpOpen, setHelpOpen] = useState(false)
@@ -245,7 +242,17 @@ export default function LiveSession() {
     regenerateAnswer,
     cancelGeneration,
     endSession,
+    reloadHistory,
   } = useSession(sessionId)
+
+  // The Focus overlay may have asked questions while this window was hidden —
+  // re-pull the history when it closes.
+  useEffect(() => {
+    if (!window.app?.onSessionRefresh) return
+    return window.app.onSessionRefresh(() => {
+      if (!isGenerating) void reloadHistory()
+    })
+  }, [isGenerating, reloadHistory])
 
   // Auto-answer is a Pro feature — gate the value too (not just the toggle UI),
   // so a stale `auto_answer='true'` can never drive it for a free/lapsed user.
@@ -320,17 +327,6 @@ export default function LiveSession() {
     }
   }, [loadError, navigate])
 
-  // Zen/reading mode: restore the sidebar when leaving the session; Esc exits.
-  useEffect(() => () => setZenMode(false), [setZenMode])
-  useEffect(() => {
-    if (!zenMode) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setZenMode(false)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [zenMode, setZenMode])
-
   const showingLive = isGenerating || currentAnswer.length > 0
   const last = qaHistory[qaHistory.length - 1]
 
@@ -384,21 +380,18 @@ export default function LiveSession() {
         onEnd={() => void endSession()}
         extra={
           <>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setZenMode(!zenMode)}
-              title={zenMode ? 'Exit reading mode (Esc)' : 'Reading mode — focus on the answer'}
-              aria-label={zenMode ? 'Exit reading mode' : 'Reading mode'}
-              aria-pressed={zenMode}
-            >
-              {zenMode ? (
-                <Minimize2 className="h-3.5 w-3.5" />
-              ) : (
+            {canStealth && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => void window.overlay?.open()}
+                title="Focus overlay — compact always-on-top stealth window (Ctrl+Shift+H)"
+                aria-label="Open Focus overlay"
+              >
                 <Maximize2 className="h-3.5 w-3.5" />
-              )}
-            </Button>
+              </Button>
+            )}
             {canStealth && <StealthToggle />}
           </>
         }
@@ -418,22 +411,6 @@ export default function LiveSession() {
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
             <Sparkles className="h-6 w-6" />
             Ask a question below — your suggested answer streams in here.
-          </div>
-        ) : zenMode ? (
-          // Reading mode: only the latest/streaming answer, extra-large.
-          <div className="space-y-5">
-            {showingLive ? (
-              <ChatTurn question={currentQuestion} answer={currentAnswer} streaming size="xl" latest />
-            ) : last ? (
-              <ChatTurn
-                question={last.question}
-                answer={last.answer}
-                size="xl"
-                latest
-                actions={lastActions}
-              />
-            ) : null}
-            <div ref={bottomRef} />
           </div>
         ) : (
           <div className="space-y-5">

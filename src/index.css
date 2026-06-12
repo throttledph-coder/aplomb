@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Stealth cursor neutrality: while stealth is active (or inside the Focus
+   overlay) the OS cursor must never change shape — the cursor renders ABOVE
+   content protection in screen shares, so pointer/text-beam/resize changes
+   would leak that the user is interacting with an invisible window. */
+.stealth-cursor,
+.stealth-cursor * {
+  cursor: default !important;
+}
+
 @layer base {
   /* Light = Claude warm cream */
   :root {

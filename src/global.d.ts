@@ -172,6 +172,17 @@ export interface ClarityAppApi {
   // Subscribe to reminder-toast clicks; returns an unsubscribe fn.
   onInterviewNavigate(cb: (id: number) => void): () => void
   onApplicationNavigate(cb: (id: number) => void): () => void
+  // Fired in the main window when the Focus overlay closes.
+  onSessionRefresh(cb: () => void): () => void
+}
+
+// Focus overlay (stealth surface) controls.
+export interface ClarityOverlayApi {
+  open(): Promise<void>
+  close(): Promise<void>
+  isOpen(): Promise<boolean>
+  setOpacity(value: number): Promise<void>
+  setAlwaysOnTop(on: boolean): Promise<void>
 }
 
 export interface UpdaterEvent {
@@ -198,5 +209,6 @@ declare global {
     license: ClarityLicenseApi
     app: ClarityAppApi
     updater: ClarityUpdaterApi
+    overlay: ClarityOverlayApi
   }
 }

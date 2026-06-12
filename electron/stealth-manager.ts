@@ -13,6 +13,9 @@ export function enableStealth(): void {
 
   main?.setSkipTaskbar(true)
   main?.setContentProtection(true)
+  // Window pickers (Zoom/Meet/Discord) show titles even when the content is
+  // protected — present a generic one while stealthed.
+  main?.setTitle('Widget')
 
   if (process.platform === 'darwin') app.dock?.hide()
 
@@ -25,6 +28,7 @@ export function disableStealth(): void {
 
   main?.setSkipTaskbar(false)
   main?.setContentProtection(false)
+  main?.setTitle('Aplomb')
 
   if (process.platform === 'darwin') app.dock?.show()
 

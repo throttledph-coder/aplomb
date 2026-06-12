@@ -1,0 +1,130 @@
+import { app, BrowserWindow, screen } from 'electron'
+import { fileURLToPath } from 'node:url'
+import path from 'node:path'
+import { getMainWindow } from './windows'
+import { getSetting, setSetting } from '../src/lib/database/queries'
+import {
+  clampBounds,
+  defaultBounds,
+  parseBounds,
+  OVERLAY_MIN_WIDTH,
+  OVERLAY_MIN_HEIGHT,
+} from '../src/lib/overlay/bounds'
+
+// The Focus overlay IS the stealth surface: a frameless toolwindow (excluded
+// from Alt+Tab and standard screen-share window pickers), skip-taskbar,
+// content-protected (black in any capture), generic title — while the main
+// window is hidden entirely (hidden windows appear nowhere). Note: transparent
+// frameless windows lose native resize on Windows, so we use a solid charcoal
+// background + Win11 native rounded corners instead.
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+let overlay: BrowserWindow | null = null
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+export function isOverlayOpen(): boolean {
+  return overlay !== null && !overlay.isDestroyed() && overlay.isVisible()
+}
+
+function persistBounds(): void {
+  if (!overlay || overlay.isDestroyed()) return
+  const b = overlay.getBounds()
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    setSetting('overlay_bounds', JSON.stringify(b))
+  }, 500)
+}
+
+export function openOverlay(): void {
+  const main = getMainWindow()
+  if (overlay && !overlay.isDestroyed()) {
+    overlay.show()
+    overlay.focus()
+    main?.hide()
+    return
+  }
+
+  const workArea = screen.getPrimaryDisplay().workArea
+  const saved = parseBounds(getSetting('overlay_bounds'))
+  const bounds = saved ? clampBounds(saved, workArea) : defaultBounds(workArea)
+
+  overlay = new BrowserWindow({
+    ...bounds,
+    minWidth: OVERLAY_MIN_WIDTH,
+    minHeight: OVERLAY_MIN_HEIGHT,
+    title: 'Widget',
+    frame: false,
+    resizable: true,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    roundedCorners: true,
+    backgroundColor: '#262624',
+    // Toolwindow (Windows) / panel (macOS): excluded from Alt+Tab and from
+    // standard application/window share pickers.
+    type: process.platform === 'darwin' ? 'panel' : 'toolbar',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.mjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  })
+  overlay.setContentProtection(true)
+  overlay.setAlwaysOnTop(true, 'screen-saver')
+  if (process.platform === 'darwin') {
+    overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    app.dock?.hide()
+  }
+
+  const opacity = Number(getSetting('overlay_opacity') ?? '1')
+  if (Number.isFinite(opacity) && opacity >= 0.3 && opacity <= 1) overlay.setOpacity(opacity)
+
+  overlay.on('moved', persistBounds)
+  overlay.on('resized', persistBounds)
+  overlay.on('closed', () => {
+    overlay = null
+    const m = getMainWindow()
+    if (process.platform === 'darwin') app.dock?.show()
+    m?.show()
+    m?.focus()
+    // Let the live session refresh anything asked from the overlay.
+    m?.webContents.send('session:refresh')
+  })
+
+  const devUrl = process.env['VITE_DEV_SERVER_URL']
+  if (devUrl) {
+    void overlay.loadURL(`${devUrl}#/overlay`)
+  } else {
+    void overlay.loadFile(path.join(process.env.APP_ROOT!, 'dist', 'index.html'), {
+      hash: '/overlay',
+    })
+  }
+
+  main?.hide()
+}
+
+export function closeOverlay(): void {
+  if (overlay && !overlay.isDestroyed()) {
+    overlay.close() // 'closed' handler restores the main window
+  } else {
+    const m = getMainWindow()
+    m?.show()
+    m?.focus()
+  }
+}
+
+export function toggleOverlay(): void {
+  if (isOverlayOpen()) closeOverlay()
+  else openOverlay()
+}
+
+export function setOverlayOpacity(value: number): void {
+  const clamped = Math.min(1, Math.max(0.3, value))
+  setSetting('overlay_opacity', String(clamped))
+  if (overlay && !overlay.isDestroyed()) overlay.setOpacity(clamped)
+}
+
+export function setOverlayAlwaysOnTop(on: boolean): void {
+  if (overlay && !overlay.isDestroyed()) overlay.setAlwaysOnTop(on, 'screen-saver')
+}

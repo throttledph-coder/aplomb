@@ -5,6 +5,7 @@ import { initDatabase, closeDatabase } from '../src/lib/database/db'
 import { registerIpcHandlers } from './ipc-handlers'
 import { setMainWindow } from './windows'
 import { enableStealth, disableStealth, isStealthActive } from './stealth-manager'
+import { toggleOverlay } from './overlay-manager'
 import { startReminderScheduler } from './reminder-scheduler'
 import { setupUpdater } from './updater'
 import { logError } from './logger'
@@ -90,6 +91,8 @@ function registerHotkeys() {
     if (isStealthActive()) disableStealth()
     else enableStealth()
   })
+  // Focus overlay toggle — also the recovery path while the main window is hidden.
+  globalShortcut.register('CommandOrControl+Shift+H', () => toggleOverlay())
 }
 
 // Quit when all windows are closed, except on macOS. There, it's common

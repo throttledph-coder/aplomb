@@ -72,6 +72,14 @@ export function useSession(sessionId: number) {
     return () => clearInterval(t)
   }, [session])
 
+  // Re-pull Q&A history (e.g. after the Focus overlay asked questions while
+  // this window was hidden). Safe no-op while an answer is streaming.
+  const reloadHistory = useCallback(async () => {
+    if (!window.db) return
+    const hist = await window.db.qa.list(sessionId)
+    setQaHistory(hist)
+  }, [sessionId])
+
   const runAnswer = useCallback(
     async (
       question: string,
@@ -181,5 +189,6 @@ export function useSession(sessionId: number) {
     regenerateAnswer,
     cancelGeneration,
     endSession,
+    reloadHistory,
   }
 }
