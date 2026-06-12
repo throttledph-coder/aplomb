@@ -19,6 +19,7 @@ import Applications from '@/pages/Applications'
 import ApplicationDetail from '@/pages/ApplicationDetail'
 import Calendar from '@/pages/Calendar'
 import Account from '@/pages/Account'
+import Overlay from '@/pages/Overlay'
 import Terms from '@/pages/legal/Terms'
 import Privacy from '@/pages/legal/Privacy'
 import Refund from '@/pages/legal/Refund'
@@ -73,6 +74,8 @@ export default function App() {
         <Route path="/legal/refund" element={<Refund />} />
         <Route element={<RequireAuth />}>
           <Route path="/onboarding" element={<Onboarding />} />
+          {/* Focus overlay window (no AppShell chrome — its own toolwindow). */}
+          <Route path="/overlay" element={<Overlay />} />
           <Route element={<RequireOnboarding />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/history" element={<History />} />

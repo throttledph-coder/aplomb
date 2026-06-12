@@ -9,6 +9,13 @@ export function StealthToggle() {
     if (window.stealth) void window.stealth.status().then(setActive)
   }, [])
 
+  // Cursor neutrality while stealthed: force the default arrow everywhere so
+  // shape changes can't reveal interaction with the (capture-invisible) window.
+  useEffect(() => {
+    document.documentElement.classList.toggle('stealth-cursor', active)
+    return () => document.documentElement.classList.remove('stealth-cursor')
+  }, [active])
+
   async function toggle() {
     if (!window.stealth) return
     if (active) {

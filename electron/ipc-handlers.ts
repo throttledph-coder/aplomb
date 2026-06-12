@@ -2,6 +2,13 @@ import { ipcMain, shell } from 'electron'
 import * as q from '../src/lib/database/queries'
 import { parseResumeFile, parseResumeText } from '../src/lib/parsers/resume-parser'
 import { enableStealth, disableStealth, isStealthActive } from './stealth-manager'
+import {
+  openOverlay,
+  closeOverlay,
+  isOverlayOpen,
+  setOverlayOpacity,
+  setOverlayAlwaysOnTop,
+} from './overlay-manager'
 import { checkForUpdates, downloadUpdate, quitAndInstall } from './updater'
 import { verifyLicense } from '../src/lib/license'
 import { logError, getLogsDir } from './logger'
@@ -137,6 +144,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ai:draftCoverLetter', (_e, input: ApplyInput) => draftCoverLetter(input))
   ipcMain.handle('ai:structureResume', (_e, rawText: string) => structureResume(rawText))
   ipcMain.handle('ai:extractJob', (_e, postingText: string) => extractJob(postingText))
+
+  // Focus overlay (stealth surface)
+  ipcMain.handle('overlay:open', () => openOverlay())
+  ipcMain.handle('overlay:close', () => closeOverlay())
+  ipcMain.handle('overlay:isOpen', () => isOverlayOpen())
+  ipcMain.handle('overlay:setOpacity', (_e, value: number) => setOverlayOpacity(value))
+  ipcMain.handle('overlay:setAlwaysOnTop', (_e, on: boolean) => setOverlayAlwaysOnTop(on))
 
   // in-app updates (electron-updater; no-op in dev)
   ipcMain.handle('updater:check', () => checkForUpdates())
