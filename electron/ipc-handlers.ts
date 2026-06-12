@@ -16,6 +16,7 @@ import {
   analyzeFit,
   draftCoverLetter,
   structureResume,
+  extractJob,
   type GenerateAnswerInput,
   type GenerateReportInput,
   type GenerateQuestionsInput,
@@ -87,6 +88,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('db:application:get', (_e, id: number) => q.getApplication(id))
   ipcMain.handle('db:application:upsertForJob', (_e, input) => q.upsertApplicationForJob(input))
   ipcMain.handle('db:application:list', () => q.listApplications())
+  ipcMain.handle('db:application:listWithActions', () => q.listApplicationsWithActions())
   ipcMain.handle('db:application:update', (_e, id: number, patch) =>
     q.updateApplication(id, patch),
   )
@@ -134,6 +136,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ai:analyzeFit', (_e, input: ApplyInput) => analyzeFit(input))
   ipcMain.handle('ai:draftCoverLetter', (_e, input: ApplyInput) => draftCoverLetter(input))
   ipcMain.handle('ai:structureResume', (_e, rawText: string) => structureResume(rawText))
+  ipcMain.handle('ai:extractJob', (_e, postingText: string) => extractJob(postingText))
 
   // in-app updates (electron-updater; no-op in dev)
   ipcMain.handle('updater:check', () => checkForUpdates())

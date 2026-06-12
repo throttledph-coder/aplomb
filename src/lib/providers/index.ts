@@ -1,4 +1,4 @@
-import type { InterviewSession, ParsedResumeData, QAPair } from '../../types'
+import type { ExtractedJob, InterviewSession, ParsedResumeData, QAPair } from '../../types'
 import { getSetting } from '../database/queries'
 import { buildResumeContext } from '../prompts/resume-context'
 import { buildJobContext } from '../prompts/jd-context'
@@ -15,6 +15,10 @@ import {
   buildGapPrompt,
   buildCoverLetterPrompt,
 } from '../prompts/apply-prompts'
+import {
+  EXTRACT_JOB_SYSTEM_PROMPT,
+  buildExtractJobPrompt,
+} from '../prompts/extract-job-prompt'
 import { CORE_SYSTEM_PROMPT, REPORT_SYSTEM_PROMPT } from '../prompts/system-prompt'
 import { GroqProvider } from './ai/groq'
 import { OllamaProvider } from './ai/ollama'
@@ -165,6 +169,43 @@ export function draftCoverLetter(input: ApplyInput): Promise<string> {
       input.jobDescription,
     ),
   })
+}
+
+// Paste-to-add: extract structured fields from a pasted job posting. On any
+// parse failure, fall back to dumping the raw text into job_description so the
+// user never loses what they pasted.
+export async function extractJob(postingText: string): Promise<ExtractedJob> {
+  const fallback: ExtractedJob = {
+    company: '',
+    job_title: '',
+    location: null,
+    salary_range: null,
+    job_description: postingText.trim(),
+  }
+  try {
+    const out = await getAIProvider().complete({
+      system: EXTRACT_JOB_SYSTEM_PROMPT,
+      user: buildExtractJobPrompt(postingText),
+    })
+    const match = out.match(/\{[\s\S]*\}/)
+    if (!match) return fallback
+    const parsed = JSON.parse(match[0]) as Partial<ExtractedJob>
+    return {
+      company: typeof parsed.company === 'string' ? parsed.company : '',
+      job_title: typeof parsed.job_title === 'string' ? parsed.job_title : '',
+      location: typeof parsed.location === 'string' && parsed.location ? parsed.location : null,
+      salary_range:
+        typeof parsed.salary_range === 'string' && parsed.salary_range
+          ? parsed.salary_range
+          : null,
+      job_description:
+        typeof parsed.job_description === 'string' && parsed.job_description.trim()
+          ? parsed.job_description
+          : fallback.job_description,
+    }
+  } catch {
+    return fallback
+  }
 }
 
 // AI resume structuring (fix bad heuristic parses).

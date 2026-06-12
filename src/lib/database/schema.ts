@@ -84,6 +84,18 @@ CREATE TABLE IF NOT EXISTS applications (
   notes         TEXT,
   session_id    INTEGER REFERENCES interview_sessions(id) ON DELETE SET NULL,
   applied_at    DATETIME,
+  salary_range  TEXT,
+  location      TEXT,
+  source        TEXT,
+  deadline      DATETIME,
+  excitement    INTEGER,
+  -- Next-action engine: what to do next and when it's due; last_activity_at is
+  -- touched by any meaningful change (status, session, interview) so staleness
+  -- can be detected. notified_action prevents reminder re-fires.
+  next_action      TEXT,
+  next_action_at   DATETIME,
+  last_activity_at DATETIME,
+  notified_action  BOOLEAN DEFAULT 0,
   created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -181,4 +193,14 @@ export function applySchema(db: Database.Database): void {
   // interview carries the personal context used when launching its session.
   addColumn('ALTER TABLE interview_sessions ADD COLUMN application_id INTEGER REFERENCES applications(id) ON DELETE SET NULL')
   addColumn('ALTER TABLE interviews ADD COLUMN additional_info TEXT')
+  // 0.19.0 — action-aware tracker: richer job fields + the next-action engine.
+  addColumn('ALTER TABLE applications ADD COLUMN salary_range TEXT')
+  addColumn('ALTER TABLE applications ADD COLUMN location TEXT')
+  addColumn('ALTER TABLE applications ADD COLUMN source TEXT')
+  addColumn('ALTER TABLE applications ADD COLUMN deadline DATETIME')
+  addColumn('ALTER TABLE applications ADD COLUMN excitement INTEGER')
+  addColumn('ALTER TABLE applications ADD COLUMN next_action TEXT')
+  addColumn('ALTER TABLE applications ADD COLUMN next_action_at DATETIME')
+  addColumn('ALTER TABLE applications ADD COLUMN last_activity_at DATETIME')
+  addColumn('ALTER TABLE applications ADD COLUMN notified_action BOOLEAN DEFAULT 0')
 }

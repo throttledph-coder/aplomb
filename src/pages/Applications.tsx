@@ -14,6 +14,10 @@ import {
   MoreHorizontal,
   Radio,
   CalendarPlus,
+  LayoutGrid,
+  List,
+  Star,
+  Wand2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -46,6 +50,9 @@ import {
 } from '@/lib/applications/status'
 import { startSessionForJob } from '@/lib/sessions/start'
 import { relativeWhen } from '@/lib/calendar/grouping'
+import { toLocalInput } from '@/lib/calendar/grid'
+import { KanbanBoard } from '@/components/applications/KanbanBoard'
+import { useAppStore } from '@/store/app-store'
 import type { Application, ApplicationStatus, Interview, Resume } from '@/types'
 
 interface DraftState {
@@ -56,6 +63,14 @@ interface DraftState {
   status: ApplicationStatus
   job_description: string
   notes: string
+  salary_range: string
+  location: string
+  source: string
+  deadline: string // datetime-local value or ''
+  excitement: number // 0 = unset, 1–5
+  next_action: string
+  next_action_at: string // datetime-local value or ''
+  paste: string // pasted posting for AI autofill (not persisted)
 }
 
 const EMPTY_DRAFT: DraftState = {
@@ -66,6 +81,14 @@ const EMPTY_DRAFT: DraftState = {
   status: 'wishlist',
   job_description: '',
   notes: '',
+  salary_range: '',
+  location: '',
+  source: '',
+  deadline: '',
+  excitement: 0,
+  next_action: '',
+  next_action_at: '',
+  paste: '',
 }
 
 export default function Applications() {
@@ -76,11 +99,14 @@ export default function Applications() {
   const [resumeId, setResumeId] = useState<number | null>(null)
   const [draft, setDraft] = useState<DraftState | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
-  const [aiBusy, setAiBusy] = useState<'fit' | 'cover' | null>(null)
+  const [aiBusy, setAiBusy] = useState<'fit' | 'cover' | 'extract' | null>(null)
   const [aiOutput, setAiOutput] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | ApplicationStatus>('all')
+  const settings = useAppStore((s) => s.settings)
+  const updateSetting = useAppStore((s) => s.updateSetting)
+  const view = (settings.applications_view as 'board' | 'list') || 'board'
 
   async function refresh() {
     if (!window.db) {
@@ -184,6 +210,14 @@ export default function Applications() {
       status: a.status,
       job_description: a.job_description ?? '',
       notes: a.notes ?? '',
+      salary_range: a.salary_range ?? '',
+      location: a.location ?? '',
+      source: a.source ?? '',
+      deadline: a.deadline ? toLocalInput(new Date(a.deadline)) : '',
+      excitement: a.excitement ?? 0,
+      next_action: a.next_action ?? '',
+      next_action_at: a.next_action_at ? toLocalInput(new Date(a.next_action_at)) : '',
+      paste: '',
     })
     setAiOutput('')
   }
@@ -203,12 +237,46 @@ export default function Applications() {
       notes: draft.notes.trim() || null,
       applied_at:
         draft.status !== 'wishlist' ? new Date().toISOString() : null,
+      salary_range: draft.salary_range.trim() || null,
+      location: draft.location.trim() || null,
+      source: draft.source.trim() || null,
+      deadline: draft.deadline || null,
+      excitement: draft.excitement > 0 ? draft.excitement : null,
+      next_action: draft.next_action.trim() || null,
+      next_action_at: draft.next_action_at || null,
     }
     if (draft.id === null) await window.db.application.create(payload)
     else await window.db.application.update(draft.id, payload)
     setDraft(null)
     await refresh()
     toast.success('Application saved.')
+  }
+
+  // Paste-to-add: AI-extract structured fields from a pasted posting; only
+  // fills blanks the model actually found — the user reviews before saving.
+  async function autofill() {
+    if (!draft || !window.ai || !draft.paste.trim()) return
+    setAiBusy('extract')
+    try {
+      const out = await window.ai.extractJob(draft.paste)
+      setDraft((d) =>
+        d === null
+          ? d
+          : {
+              ...d,
+              company: out.company || d.company,
+              job_title: out.job_title || d.job_title,
+              location: out.location ?? d.location,
+              salary_range: out.salary_range ?? d.salary_range,
+              job_description: out.job_description || d.job_description,
+            },
+      )
+      toast.success('Fields filled from the posting — review before saving.')
+    } catch (err) {
+      toast.error(`Autofill failed: ${(err as Error).message}. Check your provider in Settings.`)
+    } finally {
+      setAiBusy(null)
+    }
   }
 
   async function runAi(kind: 'fit' | 'cover') {
@@ -253,9 +321,35 @@ export default function Applications() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Applications</h1>
-        <Button onClick={openNew}>
-          <Plus className="mr-2 h-4 w-4" /> New application
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-md border p-0.5">
+            <Button
+              size="icon"
+              variant={view === 'board' ? 'secondary' : 'ghost'}
+              className="h-7 w-7"
+              onClick={() => void updateSetting('applications_view', 'board')}
+              title="Board view"
+              aria-label="Board view"
+              aria-pressed={view === 'board'}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant={view === 'list' ? 'secondary' : 'ghost'}
+              className="h-7 w-7"
+              onClick={() => void updateSetting('applications_view', 'list')}
+              title="List view"
+              aria-label="List view"
+              aria-pressed={view === 'list'}
+            >
+              <List className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <Button onClick={openNew}>
+            <Plus className="mr-2 h-4 w-4" /> New application
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -278,7 +372,7 @@ export default function Applications() {
         </Card>
       ) : (
         <div className="space-y-5">
-          {/* Search + status filter */}
+          {/* Search + status filter (the board shows every status as a column) */}
           <div className="flex gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -289,25 +383,43 @@ export default function Applications() {
                 className="pl-9"
               />
             </div>
-            <Select
-              value={statusFilter}
-              onValueChange={(v) => setStatusFilter(v as 'all' | ApplicationStatus)}
-            >
-              <SelectTrigger className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                {STATUSES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {view === 'list' && (
+              <Select
+                value={statusFilter}
+                onValueChange={(v) => setStatusFilter(v as 'all' | ApplicationStatus)}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  {STATUSES.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
-          {filteredCount === 0 ? (
+          {view === 'board' ? (
+            <KanbanBoard
+              apps={apps.filter((a) => {
+                const q = query.trim().toLowerCase()
+                if (!q) return true
+                return (
+                  a.company.toLowerCase().includes(q) || a.job_title.toLowerCase().includes(q)
+                )
+              })}
+              interviews={interviews}
+              now={new Date()}
+              onDrop={(id, status) =>
+                void window.db.application.update(id, { status }).then(refresh)
+              }
+              onOpen={(a) => navigate(`/applications/${a.id}`)}
+            />
+          ) : filteredCount === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
                 No applications match your filters.
@@ -472,6 +584,34 @@ export default function Applications() {
           </DialogHeader>
           {draft && (
             <div className="space-y-3">
+              {/* Paste-to-add: drop the whole posting in, let AI fill the form. */}
+              <div className="rounded-md border border-dashed p-3">
+                <Label className="text-xs text-muted-foreground">
+                  Paste the job posting and let AI fill the fields below
+                </Label>
+                <Textarea
+                  rows={3}
+                  className="mt-1.5"
+                  placeholder="Paste the full job posting here…"
+                  value={draft.paste}
+                  onChange={(e) => setDraft({ ...draft, paste: e.target.value })}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  disabled={aiBusy !== null || !draft.paste.trim()}
+                  onClick={() => void autofill()}
+                >
+                  {aiBusy === 'extract' ? (
+                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Wand2 className="mr-1 h-3.5 w-3.5" />
+                  )}
+                  Autofill with AI
+                </Button>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Company</Label>
@@ -510,6 +650,85 @@ export default function Applications() {
                   value={draft.job_description}
                   onChange={(e) => setDraft({ ...draft, job_description: e.target.value })}
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Location</Label>
+                  <Input
+                    placeholder="Remote · Manila · Hybrid…"
+                    value={draft.location}
+                    onChange={(e) => setDraft({ ...draft, location: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Salary range</Label>
+                  <Input
+                    placeholder="$120k–150k · PHP 40k/mo…"
+                    value={draft.salary_range}
+                    onChange={(e) => setDraft({ ...draft, salary_range: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Source</Label>
+                  <Input
+                    placeholder="LinkedIn · referral · company site…"
+                    value={draft.source}
+                    onChange={(e) => setDraft({ ...draft, source: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Deadline</Label>
+                  <Input
+                    type="datetime-local"
+                    value={draft.deadline}
+                    onChange={(e) => setDraft({ ...draft, deadline: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Next action</Label>
+                  <Input
+                    placeholder="Follow up · send thank-you…"
+                    value={draft.next_action}
+                    onChange={(e) => setDraft({ ...draft, next_action: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Next action due</Label>
+                  <Input
+                    type="datetime-local"
+                    value={draft.next_action_at}
+                    onChange={(e) => setDraft({ ...draft, next_action_at: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Excitement</Label>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      aria-label={`Excitement ${n} of 5`}
+                      onClick={() =>
+                        setDraft({ ...draft, excitement: draft.excitement === n ? 0 : n })
+                      }
+                      className="rounded p-0.5 transition-colors hover:bg-accent"
+                    >
+                      <Star
+                        className={cn(
+                          'h-4 w-4',
+                          n <= draft.excitement
+                            ? 'fill-primary text-primary'
+                            : 'text-muted-foreground/40',
+                        )}
+                      />
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label>Notes</Label>

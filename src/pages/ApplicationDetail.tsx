@@ -35,6 +35,7 @@ import {
   APPLICATION_STATUS_COLORS as STATUS_COLORS,
 } from '@/lib/applications/status'
 import { relativeWhen } from '@/lib/calendar/grouping'
+import { suggestNextAction } from '@/lib/applications/actions'
 import { launchInterviewSession } from '@/lib/calendar/launch'
 import { startSessionForJob } from '@/lib/sessions/start'
 import type {
@@ -214,6 +215,7 @@ export default function ApplicationDetail() {
 
   const upcoming = interviews.filter((iv) => iv.status === 'upcoming')
   const pastInterviews = interviews.filter((iv) => iv.status !== 'upcoming')
+  const nextAction = suggestNextAction(app, interviews, new Date())
 
   return (
     <div className="space-y-5">
@@ -228,6 +230,11 @@ export default function ApplicationDetail() {
             <div className="min-w-0">
               <h1 className="text-2xl font-semibold tracking-tight">{app.company}</h1>
               <p className="text-muted-foreground">{app.job_title}</p>
+              {(app.location || app.salary_range || app.source) && (
+                <p className="mt-1 truncate text-xs text-muted-foreground">
+                  {[app.location, app.salary_range, app.source].filter(Boolean).join(' · ')}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Select value={app.status} onValueChange={(v) => void setStatus(v as ApplicationStatus)}>
@@ -267,6 +274,18 @@ export default function ApplicationDetail() {
               </Button>
             </div>
           </div>
+
+          {nextAction && (
+            <p className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm">
+              <Clock className="h-4 w-4 shrink-0 text-primary" />
+              <span className="min-w-0 truncate">
+                <span className="font-medium">{nextAction.action}</span>
+                <span className="text-muted-foreground">
+                  {' '}· {relativeWhen(nextAction.due.toISOString(), new Date())}
+                </span>
+              </span>
+            </p>
+          )}
 
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => void prepNow()}>

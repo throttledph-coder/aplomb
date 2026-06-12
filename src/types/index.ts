@@ -211,6 +211,15 @@ export interface Application {
   notes: string | null
   session_id: number | null
   applied_at: string | null
+  salary_range: string | null
+  location: string | null
+  source: string | null
+  deadline: string | null
+  excitement: number | null // 1–5
+  next_action: string | null
+  next_action_at: string | null
+  last_activity_at: string | null
+  notified_action: boolean
   created_at: string
   updated_at: string
 }
@@ -224,6 +233,13 @@ export interface NewApplication {
   notes?: string | null
   session_id?: number | null
   applied_at?: string | null
+  salary_range?: string | null
+  location?: string | null
+  source?: string | null
+  deadline?: string | null
+  excitement?: number | null
+  next_action?: string | null
+  next_action_at?: string | null
 }
 
 export interface UpdateApplication {
@@ -234,6 +250,22 @@ export interface UpdateApplication {
   job_description?: string | null
   notes?: string | null
   applied_at?: string | null
+  salary_range?: string | null
+  location?: string | null
+  source?: string | null
+  deadline?: string | null
+  excitement?: number | null
+  next_action?: string | null
+  next_action_at?: string | null
+}
+
+// AI-extracted fields from a pasted job posting (paste-to-add autofill).
+export interface ExtractedJob {
+  company: string
+  job_title: string
+  location: string | null
+  salary_range: string | null
+  job_description: string
 }
 
 // ===== Scheduled interviews (calendar) =====

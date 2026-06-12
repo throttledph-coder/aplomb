@@ -2,6 +2,7 @@ import { Notification } from 'electron'
 import type { BrowserWindow } from 'electron'
 import * as q from '../src/lib/database/queries'
 import { computeReminderDue } from '../src/lib/calendar/reminders'
+import { actionDue } from '../src/lib/applications/actions'
 import { logError } from './logger'
 
 // Poll cadence. Reminders fire while Aplomb is running; the immediate first tick
@@ -21,6 +22,7 @@ function notify(
   id: number,
   title: string,
   body: string,
+  channel: 'interview:navigate' | 'application:navigate' = 'interview:navigate',
 ): void {
   if (!Notification.isSupported()) return
   const n = new Notification({ title, body })
@@ -30,7 +32,7 @@ function notify(
     if (win.isMinimized()) win.restore()
     win.show()
     win.focus()
-    win.webContents.send('interview:navigate', id)
+    win.webContents.send(channel, id)
   })
   n.show()
 }
@@ -57,6 +59,20 @@ function tick(getWin: () => BrowserWindow | null): void {
           `${iv.job_title} at ${fmtTime(iv.scheduled_at)}. Open Aplomb to prep and launch.`,
         )
         q.markInterviewNotified(iv.id, { day_of: true })
+      }
+    }
+    // Application follow-ups: only explicit user-set next actions notify
+    // (heuristic suggestions stay on the dashboard queue — no spam).
+    for (const app of q.listApplicationsWithActions()) {
+      if (actionDue(app, now)) {
+        notify(
+          getWin,
+          app.id,
+          `${app.next_action} — ${app.company}`,
+          `${app.job_title}. Open Aplomb to view the application.`,
+          'application:navigate',
+        )
+        q.markApplicationActionNotified(app.id)
       }
     }
   } catch (err) {
