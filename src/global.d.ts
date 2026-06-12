@@ -183,6 +183,7 @@ export interface ClarityOverlayApi {
   isOpen(): Promise<boolean>
   setOpacity(value: number): Promise<void>
   setAlwaysOnTop(on: boolean): Promise<void>
+  adjustWidth(delta: number): Promise<void>
 }
 
 export interface UpdaterEvent {

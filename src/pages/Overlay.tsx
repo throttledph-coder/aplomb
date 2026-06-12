@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Markdown, type MarkdownSize } from '@/components/report/Markdown'
+import { ModelPicker } from '@/components/session/ModelPicker'
 import { AudioBars } from '@/components/session/AudioBars'
 import { useSession } from '@/hooks/useSession'
 import { useAutoListen } from '@/hooks/useAutoListen'
@@ -33,6 +34,8 @@ import { cn } from '@/lib/utils'
 
 const ICON_BTN =
   'flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [-webkit-app-region:no-drag]'
+
+const clampNotesWidth = (w: number) => Math.min(480, Math.max(180, Math.round(w)))
 
 // The Focus overlay: a compact, draggable, always-on-top stealth surface for
 // live interviews. Lives in its own toolwindow (see electron/overlay-manager).
@@ -116,7 +119,27 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
 
   const [input, setInput] = useState('')
   const [notesOpen, setNotesOpen] = useState(false)
+  const [notesWidth, setNotesWidth] = useState(() => {
+    const w = Number(settings.overlay_notes_width ?? '260')
+    return Number.isFinite(w) ? clampNotesWidth(w) : 260
+  })
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  // Opening the panel widens the WINDOW by the panel width (and vice versa) so
+  // the chat column keeps its size — side-by-side, never covered.
+  function toggleNotes() {
+    setNotesOpen((open) => {
+      void window.overlay?.adjustWidth(open ? -notesWidth : notesWidth)
+      return !open
+    })
+  }
+
+  // Live drag keeps the window fixed (chat flexes); on release, shift the
+  // window by the net delta so the chat returns to its original width.
+  function onNotesDragEnd(totalDelta: number) {
+    void updateSetting('overlay_notes_width', String(clampNotesWidth(notesWidth)))
+    if (totalDelta !== 0) void window.overlay?.adjustWidth(totalDelta)
+  }
   const size: MarkdownSize = (settings.answer_text_size as MarkdownSize) || 'lg'
   const showingLive = isGenerating || currentAnswer.length > 0
   const last = qaHistory[qaHistory.length - 1]
@@ -148,12 +171,12 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
           title="Notes"
           aria-label="Notes"
           aria-pressed={notesOpen}
-          onClick={() => setNotesOpen((v) => !v)}
+          onClick={toggleNotes}
           className={cn(ICON_BTN, notesOpen && 'bg-accent text-foreground')}
         >
           <StickyNote className="h-3.5 w-3.5" />
         </button>
-        <QuickSettings notesOpen={notesOpen} onToggleNotes={() => setNotesOpen((v) => !v)} />
+        <QuickSettings notesOpen={notesOpen} onToggleNotes={toggleNotes} />
         <button
           title="Back to Aplomb (Esc)"
           aria-label="Close overlay"
@@ -164,9 +187,9 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
         </button>
       </div>
 
-      {/* Assistant area */}
-      <div className="relative flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto px-3 py-2">
+      {/* Assistant area + notes side panel — side-by-side, chat never covered */}
+      <div className="flex flex-1 overflow-hidden">
+        <div className="min-w-0 flex-1 overflow-y-auto px-3 py-2">
           {qaHistory.length === 0 && !showingLive && auto.pending.length === 0 ? (
             <p className="px-2 py-6 text-center text-xs text-muted-foreground">
               Ask below — or turn on the mic and let Aplomb catch the interviewer's questions.
@@ -253,8 +276,13 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
           )}
         </div>
 
-        {/* Notes slide-out panel (covers the assistant area, overlay stays open). */}
-        <NotesPanel open={notesOpen} />
+        {notesOpen && (
+          <NotesPanel
+            width={notesWidth}
+            onLiveDelta={(dx) => setNotesWidth((w) => clampNotesWidth(w + dx))}
+            onDragEnd={onNotesDragEnd}
+          />
+        )}
       </div>
 
       {/* Composer */}
@@ -304,27 +332,31 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
                 </>
               )}
             </div>
-            {isGenerating ? (
-              <Button
-                size="icon"
-                variant="secondary"
-                className="h-7 w-7 rounded-full [-webkit-app-region:no-drag]"
-                onClick={cancelGeneration}
-                aria-label="Stop generating"
-              >
-                <Square className="h-3 w-3" />
-              </Button>
-            ) : (
-              <Button
-                size="icon"
-                className="h-7 w-7 rounded-full [-webkit-app-region:no-drag]"
-                disabled={input.trim().length === 0}
-                onClick={submit}
-                aria-label="Send"
-              >
-                <Send className="h-3.5 w-3.5" />
-              </Button>
-            )}
+            <div className="flex items-center gap-1">
+              {/* Answer length + provider/model, same ⚙ popover as the live page. */}
+              <ModelPicker />
+              {isGenerating ? (
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  className="h-7 w-7 rounded-full [-webkit-app-region:no-drag]"
+                  onClick={cancelGeneration}
+                  aria-label="Stop generating"
+                >
+                  <Square className="h-3 w-3" />
+                </Button>
+              ) : (
+                <Button
+                  size="icon"
+                  className="h-7 w-7 rounded-full [-webkit-app-region:no-drag]"
+                  disabled={input.trim().length === 0}
+                  onClick={submit}
+                  aria-label="Send"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -332,14 +364,24 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
   )
 }
 
-// Markdown cheat-sheet panel: STAR stories, achievements, talking points.
-// Autosaves to the interview_notes setting (debounced).
-function NotesPanel({ open }: { open: boolean }) {
+// Markdown cheat-sheet side panel: STAR stories, achievements, talking points.
+// Sits beside the chat (never covers it); left edge drag-resizes; autosaves to
+// the interview_notes setting (debounced).
+function NotesPanel({
+  width,
+  onLiveDelta,
+  onDragEnd,
+}: {
+  width: number
+  onLiveDelta: (dx: number) => void
+  onDragEnd: (totalDelta: number) => void
+}) {
   const settings = useAppStore((s) => s.settings)
   const updateSetting = useAppStore((s) => s.updateSetting)
   const [text, setText] = useState(settings.interview_notes ?? '')
   const [preview, setPreview] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const drag = useRef<{ lastX: number; total: number } | null>(null)
 
   function onChange(v: string) {
     setText(v)
@@ -348,13 +390,31 @@ function NotesPanel({ open }: { open: boolean }) {
   }
 
   return (
-    <div
-      className={cn(
-        'absolute inset-0 flex flex-col bg-background transition-transform duration-200',
-        open ? 'translate-x-0' : 'translate-x-full',
-      )}
-      aria-hidden={!open}
-    >
+    <div className="relative flex shrink-0 flex-col border-l bg-background" style={{ width }}>
+      {/* Drag handle on the panel's left edge (panel grows leftward). */}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize notes panel"
+        onPointerDown={(e) => {
+          drag.current = { lastX: e.clientX, total: 0 }
+          e.currentTarget.setPointerCapture(e.pointerId)
+        }}
+        onPointerMove={(e) => {
+          if (!drag.current) return
+          const dx = drag.current.lastX - e.clientX
+          drag.current.lastX = e.clientX
+          drag.current.total += dx
+          onLiveDelta(dx)
+        }}
+        onPointerUp={(e) => {
+          const total = drag.current?.total ?? 0
+          drag.current = null
+          e.currentTarget.releasePointerCapture(e.pointerId)
+          onDragEnd(total)
+        }}
+        className="absolute inset-y-0 -left-0.5 z-10 w-1.5 transition-colors hover:bg-primary/40"
+      />
       <div className="flex items-center justify-between border-b px-3 py-1.5">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Notes

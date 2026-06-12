@@ -158,6 +158,7 @@ export const DEFAULT_SETTINGS: ReadonlyArray<readonly [string, string]> = [
   ['overlay_position', 'top-right'],
   ['overlay_opacity', '0.92'],
   ['overlay_bounds', ''],
+  ['overlay_notes_width', '260'],
   ['interview_notes', ''],
   ['hotkey_toggle_overlay', 'CommandOrControl+Shift+H'],
   ['hotkey_copy_answer', 'CommandOrControl+Shift+C'],

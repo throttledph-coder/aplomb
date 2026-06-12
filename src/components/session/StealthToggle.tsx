@@ -33,7 +33,11 @@ export function StealthToggle() {
       variant={active ? 'default' : 'outline'}
       className="h-8 w-8"
       onClick={() => void toggle()}
-      title={active ? 'Stealth on — hidden from screen share' : 'Stealth off — visible to screen share'}
+      title={
+        active
+          ? 'Stealth on — Aplomb lives in the Focus overlay, invisible to share pickers'
+          : 'Stealth — hides Aplomb into the Focus overlay (Ctrl+Shift+S)'
+      }
       aria-label={active ? 'Disable stealth mode' : 'Enable stealth mode'}
       aria-pressed={active}
     >

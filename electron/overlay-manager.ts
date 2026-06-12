@@ -22,6 +22,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 let overlay: BrowserWindow | null = null
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+let onClosedCb: (() => void) | null = null
+
+// Hook fired after the overlay closes and the main window is restored —
+// main.ts uses it to exit stealth when the user leaves the overlay.
+export function setOnClosed(cb: () => void): void {
+  onClosedCb = cb
+}
 
 export function isOverlayOpen(): boolean {
   return overlay !== null && !overlay.isDestroyed() && overlay.isVisible()
@@ -90,6 +97,7 @@ export function openOverlay(): void {
     m?.focus()
     // Let the live session refresh anything asked from the overlay.
     m?.webContents.send('session:refresh')
+    onClosedCb?.()
   })
 
   const devUrl = process.env['VITE_DEV_SERVER_URL']
@@ -127,4 +135,15 @@ export function setOverlayOpacity(value: number): void {
 
 export function setOverlayAlwaysOnTop(on: boolean): void {
   if (overlay && !overlay.isDestroyed()) overlay.setAlwaysOnTop(on, 'screen-saver')
+}
+
+// Grow/shrink the window width (e.g. the Notes side panel opening/closing) so
+// the chat column keeps its size. Clamped to the window's current display.
+export function adjustOverlayWidth(delta: number): void {
+  if (!overlay || overlay.isDestroyed()) return
+  const b = overlay.getBounds()
+  const work = screen.getDisplayMatching(b).workArea
+  const width = Math.min(Math.max(b.width + delta, OVERLAY_MIN_WIDTH), work.width)
+  const x = Math.min(Math.max(b.x, work.x), work.x + work.width - width)
+  overlay.setBounds({ x, y: b.y, width, height: b.height })
 }
