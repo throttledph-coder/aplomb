@@ -135,6 +135,7 @@ contextBridge.exposeInMainWorld('overlay', {
   isOpen: () => invoke('overlay:isOpen'),
   setOpacity: (value: number) => invoke('overlay:setOpacity', value),
   setAlwaysOnTop: (on: boolean) => invoke('overlay:setAlwaysOnTop', on),
+  adjustWidth: (delta: number) => invoke('overlay:adjustWidth', delta),
 })
 
 // --------- In-app updates (electron-updater) ---------

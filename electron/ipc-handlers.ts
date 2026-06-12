@@ -8,6 +8,7 @@ import {
   isOverlayOpen,
   setOverlayOpacity,
   setOverlayAlwaysOnTop,
+  adjustOverlayWidth,
 } from './overlay-manager'
 import { checkForUpdates, downloadUpdate, quitAndInstall } from './updater'
 import { verifyLicense } from '../src/lib/license'
@@ -151,6 +152,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('overlay:isOpen', () => isOverlayOpen())
   ipcMain.handle('overlay:setOpacity', (_e, value: number) => setOverlayOpacity(value))
   ipcMain.handle('overlay:setAlwaysOnTop', (_e, on: boolean) => setOverlayAlwaysOnTop(on))
+  ipcMain.handle('overlay:adjustWidth', (_e, delta: number) => adjustOverlayWidth(delta))
 
   // in-app updates (electron-updater; no-op in dev)
   ipcMain.handle('updater:check', () => checkForUpdates())
