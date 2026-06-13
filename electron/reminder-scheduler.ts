@@ -3,6 +3,7 @@ import type { BrowserWindow } from 'electron'
 import * as q from '../src/lib/database/queries'
 import { computeReminderDue } from '../src/lib/calendar/reminders'
 import { actionDue } from '../src/lib/applications/actions'
+import { isStealthActive } from './stealth-manager'
 import { logError } from './logger'
 
 // Poll cadence. Reminders fire while Aplomb is running; the immediate first tick
@@ -39,6 +40,10 @@ function notify(
 
 function tick(getWin: () => BrowserWindow | null): void {
   try {
+    // Never surface a toast during stealth — it would leak the app's presence
+    // mid-interview and could un-hide the main window on click. Reminders for
+    // not-yet-due interviews still fire on the next tick once stealth is off.
+    if (isStealthActive()) return
     const now = new Date()
     for (const iv of q.listUpcomingInterviews()) {
       const due = computeReminderDue(iv, now)
