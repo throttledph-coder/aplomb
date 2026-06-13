@@ -60,7 +60,11 @@ export function openOverlay(): void {
     ...bounds,
     minWidth: OVERLAY_MIN_WIDTH,
     minHeight: OVERLAY_MIN_HEIGHT,
-    title: 'Widget',
+    // EMPTY title is load-bearing: Chromium's getDisplayMedia picker (Brave →
+    // Meet/Zoom-web) enumerates with kIgnoreUntitled, so an untitled window is
+    // dropped from the "Select a window" list. Combined with the toolwindow
+    // style + content protection below.
+    title: '',
     frame: false,
     resizable: true,
     skipTaskbar: true,
@@ -79,6 +83,11 @@ export function openOverlay(): void {
   })
   overlay.setContentProtection(true)
   overlay.setAlwaysOnTop(true, 'screen-saver')
+  // The overlay loads the app's index.html (<title>Aplomb</title>); stop that
+  // from renaming the window, and re-assert an empty title after load — keeps
+  // the window untitled so share pickers never list it.
+  overlay.webContents.on('page-title-updated', (e) => e.preventDefault())
+  overlay.webContents.on('did-finish-load', () => overlay?.setTitle(''))
   if (process.platform === 'darwin') {
     overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
     app.dock?.hide()

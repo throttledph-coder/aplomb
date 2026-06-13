@@ -547,6 +547,9 @@ function QuickSettings({
           <p>Ctrl+Shift+H — show/hide overlay</p>
           <p>Ctrl+Shift+S — stealth on/off</p>
           <p>Esc — back to Aplomb</p>
+          <p className="pt-1 text-muted-foreground/70">
+            Hidden from screen-share pickers. OBS may still capture black.
+          </p>
         </div>
       </PopoverContent>
     </Popover>
