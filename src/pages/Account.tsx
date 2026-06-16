@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { RefreshCw, CreditCard, Loader2, Trash2, Download, CheckCircle2, RotateCw } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { RefreshCw, CreditCard, Loader2, Trash2, Download, Upload } from 'lucide-react'
 import { buildCheckoutUrl } from '@/lib/billing/config'
 import { supabase } from '@/lib/supabase/client'
+import { parseExport } from '@/lib/backup'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { useUpdater } from '@/hooks/useUpdater'
 import {
   Dialog,
   DialogContent,
@@ -20,8 +18,6 @@ import {
 import { ProfileFields, EMPTY_PROFILE, type ProfileDraft } from '@/components/profile/ProfileFields'
 import { useAppStore } from '@/store/app-store'
 
-const SUPPORT_EMAIL = 'hello@aplomb.app'
-
 function fmtDate(iso?: string | null): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString(undefined, {
@@ -32,7 +28,6 @@ function fmtDate(iso?: string | null): string {
 }
 
 export default function Account() {
-  const navigate = useNavigate()
   const user = useAppStore((s) => s.user)
   const plan = useAppStore((s) => s.plan)
   const subscriptionActive = useAppStore((s) => s.subscriptionActive)
@@ -40,7 +35,7 @@ export default function Account() {
   const profile = useAppStore((s) => s.profile)
   const refreshSubscription = useAppStore((s) => s.refreshSubscription)
   const updateProfile = useAppStore((s) => s.updateProfile)
-  const updater = useUpdater()
+  const loadSettings = useAppStore((s) => s.loadSettings)
   const deleteAccount = useAppStore((s) => s.deleteAccount)
 
   const [refreshing, setRefreshing] = useState(false)
@@ -49,6 +44,8 @@ export default function Account() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [clearing, setClearing] = useState(false)
+  const [showClear, setShowClear] = useState(false)
 
   // Seed the editable form from the loaded profile.
   useEffect(() => {
@@ -138,6 +135,93 @@ export default function Account() {
       }
     } finally {
       setDeleting(false)
+    }
+  }
+
+  // Local data lives on this device; export/import/clear belong with the
+  // account's data controls (alongside delete).
+  async function exportData() {
+    if (!window.db) return
+    const resumes = await window.db.resume.list()
+    const sessions = await window.db.session.list()
+    const qaBySession: Record<number, unknown> = {}
+    for (const s of sessions) qaBySession[s.id] = await window.db.qa.list(s.id)
+    const payload = {
+      exported_at: new Date().toISOString(),
+      settings: await window.db.settings.getAll(),
+      resumes,
+      sessions,
+      qa: qaBySession,
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `aplomb-export-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Data exported.')
+  }
+
+  async function importData(file: File) {
+    if (!window.db) return
+    let parsed
+    try {
+      parsed = parseExport(await file.text())
+    } catch (err) {
+      toast.error(`Import failed: ${(err as Error).message}`)
+      return
+    }
+    const resumeIdMap = new Map<number, number>()
+    for (const r of parsed.resumes) {
+      const created = await window.db.resume.create({
+        name: r.name,
+        file_name: r.file_name,
+        raw_text: r.raw_text,
+        parsed_data: r.parsed_data,
+        is_default: r.is_default,
+      })
+      resumeIdMap.set(r.id, created.id)
+    }
+    let sessionCount = 0
+    for (const s of parsed.sessions) {
+      const newResumeId = resumeIdMap.get(s.resume_id)
+      if (newResumeId === undefined) continue
+      const created = await window.db.session.create({
+        resume_id: newResumeId,
+        session_name: s.session_name,
+        company: s.company,
+        job_title: s.job_title,
+        interview_type: s.interview_type,
+        job_description: s.job_description,
+        parsed_jd: s.parsed_jd,
+        additional_info: s.additional_info,
+      })
+      sessionCount++
+      for (const qa of parsed.qa[String(s.id)] ?? []) {
+        await window.db.qa.create({
+          session_id: created.id,
+          question: qa.question,
+          answer: qa.answer,
+          question_source: qa.question_source,
+          sequence_order: qa.sequence_order,
+        })
+      }
+    }
+    toast.success(`Imported ${resumeIdMap.size} resumes, ${sessionCount} sessions.`)
+  }
+
+  async function clearData() {
+    if (!window.db) return
+    setClearing(true)
+    try {
+      for (const s of await window.db.session.list()) await window.db.session.delete(s.id)
+      for (const r of await window.db.resume.list()) await window.db.resume.delete(r.id)
+      await loadSettings()
+      toast.success('All resumes and sessions cleared.')
+    } finally {
+      setClearing(false)
+      setShowClear(false)
     }
   }
 
@@ -236,105 +320,41 @@ export default function Account() {
         </CardContent>
       </Card>
 
-      {/* Updates */}
+      {/* Privacy & Data */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Updates</CardTitle>
+          <CardTitle className="text-base">Privacy &amp; data</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Current version</span>
-            <span className="font-medium">Aplomb {__APP_VERSION__}</span>
-          </div>
-
-          {import.meta.env.DEV ? (
-            <p className="text-xs text-muted-foreground">
-              Auto-update runs in the installed app, not in development.
-            </p>
-          ) : (
-            <>
-              {updater.status === 'downloading' && (
-                <div className="space-y-1.5">
-                  <Progress value={updater.percent} />
-                  <p className="text-xs text-muted-foreground">Downloading update… {updater.percent}%</p>
-                </div>
-              )}
-              {updater.status === 'available' && (
-                <p className="text-xs text-muted-foreground">
-                  Version {updater.version} is available.
-                </p>
-              )}
-              {updater.status === 'not-available' && (
-                <p className="text-xs text-muted-foreground">You're on the latest version.</p>
-              )}
-              {updater.status === 'error' && (
-                <p className="text-xs text-destructive">{updater.error}</p>
-              )}
-
-              <div className="flex flex-wrap gap-2">
-                {updater.status === 'downloaded' ? (
-                  <Button size="sm" onClick={() => void updater.install()}>
-                    <RotateCw className="mr-2 h-4 w-4" /> Restart &amp; install
-                  </Button>
-                ) : updater.status === 'available' ? (
-                  <Button size="sm" onClick={() => void updater.download()}>
-                    <Download className="mr-2 h-4 w-4" /> Download update
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={updater.status === 'checking' || updater.status === 'downloading'}
-                    onClick={() => void updater.check()}
-                  >
-                    {updater.status === 'checking' ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : updater.status === 'not-available' ? (
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                    ) : (
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                    )}
-                    Check for updates
-                  </Button>
-                )}
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* About */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">About</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Version</span>
-            <span className="font-medium">Aplomb {__APP_VERSION__}</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate('/legal/terms')}>
-              Terms
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/legal/privacy')}>
-              Privacy
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/legal/refund')}>
-              Refund
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void window.app?.openExternal(`mailto:${SUPPORT_EMAIL}`)}
-            >
-              Contact support
-            </Button>
-          </div>
+        <CardContent className="space-y-3">
           <p className="text-xs text-muted-foreground">
-            Your resume, job descriptions, and answers stay on this device or go only to your own
-            AI provider. We store just your account email, profile, and subscription status.
+            Your resumes and sessions are stored locally on this device. Export a backup, import one,
+            or clear everything.
           </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => void exportData()}>
+              <Download className="mr-2 h-4 w-4" /> Export all data
+            </Button>
+            <label>
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) void importData(f)
+                  e.target.value = ''
+                }}
+              />
+              <Button variant="outline" asChild>
+                <span>
+                  <Upload className="mr-2 h-4 w-4" /> Import data
+                </span>
+              </Button>
+            </label>
+            <Button variant="ghost" onClick={() => setShowClear(true)}>
+              <Trash2 className="mr-2 h-4 w-4" /> Clear all data
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -379,6 +399,26 @@ export default function Account() {
               ) : (
                 'Delete account'
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showClear} onOpenChange={(o) => !clearing && setShowClear(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear all data?</DialogTitle>
+            <DialogDescription>
+              Permanently deletes all resumes and sessions (with their Q&amp;A and reports) from this
+              device. Your settings and API key are kept. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowClear(false)} disabled={clearing}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => void clearData()} disabled={clearing}>
+              {clearing ? 'Clearing…' : 'Clear everything'}
             </Button>
           </DialogFooter>
         </DialogContent>

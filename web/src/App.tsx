@@ -82,6 +82,18 @@ const ico = {
       <path d="M5 12h14" />
     </svg>
   ),
+  calendar: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  ),
+  layers: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2 2 7l10 5 10-5-10-5Z" />
+      <path d="m2 17 10 5 10-5M2 12l10 5 10-5" />
+    </svg>
+  ),
 }
 
 interface Feature {
@@ -94,16 +106,18 @@ interface Feature {
 const FEATURES: Feature[] = [
   { icon: ico.doc, title: 'Tailored practice answers', body: 'Upload your resume + the job description and get strong, personal answers to likely questions — grounded only in your real experience.' },
   { icon: ico.target, title: 'Coaching feedback', body: 'Each session ends with a report: what landed, keyword coverage vs. the role, and concrete ways to tighten your delivery.' },
-  { icon: ico.kanban, title: 'Application tracker', body: 'Track every role — wishlist, applied, interviewing, offer — with notes, AI resume↔JD gap analysis, and cover-letter drafts.' },
+  { icon: ico.kanban, title: 'Application tracker', body: 'A Kanban pipeline from wishlist to offer — drag between stages, with follow-up reminders, a next-action queue, AI resume↔JD gap analysis, and cover-letter drafts.' },
+  { icon: ico.calendar, title: 'Interview calendar & reminders', body: 'Schedule each round and get native reminders the day before and minutes before — then launch a session already prepped for that interview in one click.' },
   { icon: ico.mic, title: 'Auto-listen + live answers', pro: true, body: "Aplomb transcribes the interviewer's questions in real time (Groq Whisper) as cards you can Use, Edit, or Combine — or flip on Auto-answer to combine detected questions and draft a concise, headline-first reply hands-free, in mock practice or a live call." },
+  { icon: ico.layers, title: 'Focus overlay & notes', pro: true, body: 'A compact, always-on-top command center with your AI answers and a private notes cheat-sheet — STAR stories and talking points at a glance, hidden from screen share.' },
   { icon: ico.lock, title: 'Private by design', body: 'Bring your own API key or run fully local with Ollama — your resume and answers stay on your machine, encrypted.' },
-  { icon: ico.shield, title: 'Stealth mode', pro: true, body: 'Turn it on and the Aplomb window is hidden from screen sharing and recording (Zoom, Meet, Teams) and drops off the taskbar — your notes stay private to you, always on top while you talk.' },
+  { icon: ico.shield, title: 'Stealth mode', pro: true, body: 'Switch it on and Aplomb moves into the Focus overlay — excluded from screen-share pickers and recording (Zoom, Meet, Teams), off the taskbar and Alt+Tab, visible only to you.' },
 ]
 
 const STATS: { value: ReactNode; label: string }[] = [
   { value: <Counter to={100} suffix="%" />, label: 'Runs on your machine' },
   { value: '$0', label: 'Free forever for prep' },
-  { value: <Counter to={6} suffix="+" />, label: 'AI tools built in' },
+  { value: '$9', label: 'Pro / month' },
   { value: '∞', label: 'Practice sessions' },
 ]
 
@@ -115,20 +129,21 @@ const COMPARE: { label: string; aplomb: boolean; generic: boolean }[] = [
   { label: 'Answers grounded only in your real resume + the JD', aplomb: true, generic: false },
   { label: 'Coaching report after every session', aplomb: true, generic: false },
   { label: 'Application tracker + cover-letter drafts', aplomb: true, generic: false },
+  { label: 'Interview calendar with scheduling + reminders', aplomb: true, generic: false },
   { label: 'Free, unlimited preparation', aplomb: true, generic: false },
 ]
 
 const STEPS = [
   { h: 'Add your resume + the job', p: 'Paste a job description and pick a resume. Add any extra context you want answers to reflect.' },
   { h: 'Practice with AI answers', p: 'Get sharp, first-person answers to likely questions and rehearse them out loud.' },
-  { h: 'Review & track', p: 'Read your coaching report, refine, and track every application to offer.' },
+  { h: 'Track & schedule', p: 'Read your coaching report, track every application to offer, and schedule interviews with reminders.' },
 ]
 
 const FAQ = [
   { q: 'Is my data private?', a: 'Yes. Everything runs on your computer. You use your own AI key (Groq free tier) or run locally with Ollama — your resume and answers are never stored on our servers, and your key is encrypted on-device.' },
   { q: 'What platforms are supported?', a: 'Windows today. Mac and Linux are planned.' },
   { q: 'Is the window hidden during screen sharing?', a: 'With Stealth mode on (Windows), Aplomb uses OS screen-capture protection so its window is excluded from screen sharing and recording in apps like Zoom, Meet, and Teams, while staying visible to you. It is a privacy feature for your own setup, not a guarantee against every possible capture method.' },
-  { q: 'What do I get with Pro?', a: "Live auto-listen — Aplomb transcribes the interviewer's questions in real time (Groq Whisper), lets you Use/Edit/Combine them, and can Auto-answer hands-free (detected questions combined + answered automatically) with a distraction-free Focus mode — plus stealth mode (hidden from screen share) and tray mode. All preparation features — resume tailoring, practice answers, reports, and the tracker — are free and unlimited." },
+  { q: 'What do I get with Pro?', a: "Live auto-listen — Aplomb transcribes the interviewer's questions in real time (Groq Whisper), lets you Use/Edit/Combine them, and can Auto-answer hands-free (detected questions combined + answered automatically) — plus the Focus overlay (a compact always-on-top assistant with a private notes panel) and stealth mode (hidden from screen-share pickers and recording). All preparation features — resume tailoring, practice answers, reports, the tracker, and the calendar — are free and unlimited." },
   { q: 'How does billing work?', a: 'Pro is a monthly subscription handled by our payment provider (Lemon Squeezy), who manages taxes and receipts. Cancel anytime.' },
 ]
 
@@ -377,7 +392,7 @@ export default function App() {
                 <li>{ico.check} Unlimited practice sessions</li>
                 <li>{ico.check} Resume + job-description tailoring</li>
                 <li>{ico.check} Coaching reports & keyword coverage</li>
-                <li>{ico.check} Application tracker + cover letters</li>
+                <li>{ico.check} Application tracker + calendar & reminders</li>
                 <li>{ico.check} Bring your own key or local Ollama</li>
               </ul>
               <motion.a className="btn btn-ghost" href={DOWNLOAD_PAGE} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
@@ -390,9 +405,9 @@ export default function App() {
               <div className="amt">{PRO_PRICE} <small>/ month</small></div>
               <ul>
                 <li>{ico.check} Everything in Free</li>
-                <li>{ico.check} Live practice assistant (real-time)</li>
-                <li>{ico.check} Focus mode</li>
-                <li>{ico.check} Priority updates</li>
+                <li>{ico.check} Live auto-listen + answers</li>
+                <li>{ico.check} Focus overlay + private notes</li>
+                <li>{ico.check} Stealth mode (hidden from screen share)</li>
               </ul>
               <motion.a className="btn btn-primary" href={PRO_CHECKOUT_URL} target="_blank" rel="noopener noreferrer" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
                 Get Pro {ico.arrow}

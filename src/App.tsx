@@ -19,6 +19,7 @@ import Applications from '@/pages/Applications'
 import ApplicationDetail from '@/pages/ApplicationDetail'
 import Calendar from '@/pages/Calendar'
 import Account from '@/pages/Account'
+import HelpAbout from '@/pages/HelpAbout'
 import Overlay from '@/pages/Overlay'
 import Terms from '@/pages/legal/Terms'
 import Privacy from '@/pages/legal/Privacy'
@@ -85,6 +86,7 @@ export default function App() {
             <Route path="/resumes" element={<ResumeManager />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/account" element={<Account />} />
+            <Route path="/help" element={<HelpAbout />} />
             <Route path="/setup/resume" element={<SetupResume />} />
             <Route path="/setup/job" element={<SetupJobDescription />} />
             <Route path="/session/:id" element={<LiveSession />} />

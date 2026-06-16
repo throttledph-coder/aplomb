@@ -44,6 +44,9 @@ function tick(getWin: () => BrowserWindow | null): void {
     // mid-interview and could un-hide the main window on click. Reminders for
     // not-yet-due interviews still fire on the next tick once stealth is off.
     if (isStealthActive()) return
+    // Global off-switch (Settings → Notifications). Per-interview reminder
+    // fields are unchanged; this just silences delivery.
+    if (q.getSetting('reminders_enabled') === 'false') return
     const now = new Date()
     for (const iv of q.listUpcomingInterviews()) {
       const due = computeReminderDue(iv, now)
