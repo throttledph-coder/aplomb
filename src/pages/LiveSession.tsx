@@ -33,6 +33,7 @@ import { SessionHeader } from '@/components/session/SessionHeader'
 import { StealthToggle } from '@/components/session/StealthToggle'
 import { AudioBars } from '@/components/session/AudioBars'
 import { ModelPicker } from '@/components/session/ModelPicker'
+import { TranscribeStatus } from '@/components/session/TranscribeStatus'
 import { Markdown, type MarkdownSize } from '@/components/report/Markdown'
 // Quiet h-6 icon button used across the composer bar, bubble actions, and
 // Heard-card secondaries — one consistent affordance.
@@ -405,10 +406,23 @@ export default function LiveSession() {
         aria-live="polite"
         aria-atomic="false"
         aria-label="Interview conversation"
-        className="flex-1 overflow-y-auto px-1"
+        className="flex-1 space-y-3 overflow-y-auto px-1"
       >
+        {/* Live transcription status — always visible while listening. */}
+        {canAutoListen && (auto.isListening || auto.lastError) && (
+          <TranscribeStatus
+            listening={auto.isListening}
+            transcribing={auto.transcribing}
+            lastTranscript={auto.lastTranscript}
+            lastError={auto.lastError}
+            onRetry={auto.retry}
+            onSubmitLast={auto.submitLastTranscript}
+            onDismiss={auto.dismissError}
+            onOpenSettings={() => navigate('/settings')}
+          />
+        )}
         {empty ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+          <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-sm text-muted-foreground">
             <Sparkles className="h-6 w-6" />
             Ask a question below — your suggested answer streams in here.
           </div>

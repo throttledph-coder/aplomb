@@ -26,6 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Markdown, type MarkdownSize } from '@/components/report/Markdown'
 import { ModelPicker } from '@/components/session/ModelPicker'
 import { AudioBars } from '@/components/session/AudioBars'
+import { TranscribeStatus } from '@/components/session/TranscribeStatus'
 import { useSession } from '@/hooks/useSession'
 import { useAutoListen } from '@/hooks/useAutoListen'
 import { useAppStore } from '@/store/app-store'
@@ -189,7 +190,19 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
 
       {/* Assistant area + notes side panel — side-by-side, chat never covered */}
       <div className="flex flex-1 overflow-hidden">
-        <div className="min-w-0 flex-1 overflow-y-auto px-3 py-2">
+        <div className="min-w-0 flex-1 space-y-3 overflow-y-auto px-3 py-2">
+          {canAutoListen && (auto.isListening || auto.lastError) && (
+            <TranscribeStatus
+              listening={auto.isListening}
+              transcribing={auto.transcribing}
+              lastTranscript={auto.lastTranscript}
+              lastError={auto.lastError}
+              onRetry={auto.retry}
+              onSubmitLast={auto.submitLastTranscript}
+              onDismiss={auto.dismissError}
+              onOpenSettings={() => void window.overlay?.close()}
+            />
+          )}
           {qaHistory.length === 0 && !showingLive && auto.pending.length === 0 ? (
             <p className="px-2 py-6 text-center text-xs text-muted-foreground">
               Ask below — or turn on the mic and let Aplomb catch the interviewer's questions.
