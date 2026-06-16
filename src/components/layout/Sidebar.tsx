@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Home, History, FileText, Settings, Briefcase, CalendarDays, ChevronDown, LogOut, User, Sparkles } from 'lucide-react'
+import { Home, History, FileText, Settings, Briefcase, CalendarDays, ChevronDown, LogOut, User, Sparkles, HelpCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AplombMark } from '@/components/brand/Logo'
 import { useAppStore } from '@/store/app-store'
@@ -110,6 +110,15 @@ export function Sidebar() {
               }}
             >
               <User className="h-4 w-4" /> Account
+            </button>
+            <button
+              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-foreground hover:bg-accent"
+              onClick={() => {
+                setMenuOpen(false)
+                navigate('/help')
+              }}
+            >
+              <HelpCircle className="h-4 w-4" /> Help &amp; About
             </button>
             <button
               className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-foreground hover:bg-accent"

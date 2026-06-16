@@ -82,7 +82,7 @@ export function openOverlay(): void {
     },
   })
   overlay.setContentProtection(true)
-  overlay.setAlwaysOnTop(true, 'screen-saver')
+  overlay.setAlwaysOnTop(getSetting('overlay_always_on_top') !== 'false', 'screen-saver')
   // The overlay loads the app's index.html (<title>Aplomb</title>); stop that
   // from renaming the window, and re-assert an empty title after load — keeps
   // the window untitled so share pickers never list it.
