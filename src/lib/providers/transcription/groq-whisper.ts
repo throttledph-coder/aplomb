@@ -14,7 +14,7 @@ export class GroqWhisperTranscriber implements AudioTranscriber {
 
   async transcribe(audio: Uint8Array): Promise<string> {
     const file = await toFile(Buffer.from(audio), 'audio.webm')
-    const res = await this.client.audio.transcriptions.create({
+    const params = {
       file,
       model: WHISPER_MODEL,
       // Tuned for live interview audio: fix the language (avoids misdetection on
@@ -23,7 +23,17 @@ export class GroqWhisperTranscriber implements AudioTranscriber {
       language: 'en',
       temperature: 0,
       prompt: "Transcribe the interviewer's question verbatim, with correct punctuation.",
-    })
-    return res.text
+    } as const
+    try {
+      return (await this.client.audio.transcriptions.create(params)).text
+    } catch (err) {
+      // One short backoff on rate limits — Groq's free tier spikes during a
+      // live session; a single retry absorbs most transient 429s.
+      if ((err as { status?: number })?.status === 429) {
+        await new Promise((r) => setTimeout(r, 1200))
+        return (await this.client.audio.transcriptions.create(params)).text
+      }
+      throw err
+    }
   }
 }

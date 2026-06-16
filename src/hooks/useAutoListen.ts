@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { AudioRecorder } from '@/lib/audio/recorder'
 import { detectQuestion } from '@/lib/audio/question-filter'
+import {
+  classifyTranscribeError,
+  transcribeErrorMessage,
+  type TranscribeErrorKind,
+} from '@/lib/audio/transcribe-error'
 
 const MAX_PENDING = 6
 const FLUSH_MS = 3500 // quiet window after the last detected question before auto-answering
@@ -35,9 +40,17 @@ export interface UseAutoListenOptions {
 export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }: UseAutoListenOptions) {
   const recorderRef = useRef<AudioRecorder | null>(null)
   const levelTimer = useRef<ReturnType<typeof setInterval> | null>(null)
-  const erroredRef = useRef(false)
   const heardRef = useRef(false)
   const startedAtRef = useRef(0)
+
+  // Transcription resilience: in-flight count drives the "Transcribing…" state;
+  // the last failed clip is retained for Retry; a key error pauses attempts
+  // (no point hammering Whisper) and shows its actionable toast only once.
+  const inFlightRef = useRef(0)
+  const lastFailedClipRef = useRef<Blob | null>(null)
+  const keyErrorRef = useRef(false)
+  const keyToastShownRef = useRef(false)
+  const retryTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
 
   // Latest-value refs so the auto-flush timer never runs on stale closures.
   const onQuestionRef = useRef(onQuestion)
@@ -52,7 +65,11 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
 
   const [isListening, setIsListening] = useState(false)
   const [pending, setPending] = useState<PendingQuestion[]>([])
-  const [interim, setInterim] = useState('')
+  const [lastTranscript, setLastTranscript] = useState('')
+  const [transcribing, setTranscribing] = useState(false)
+  const [lastError, setLastError] = useState<{ kind: TranscribeErrorKind; message: string } | null>(
+    null,
+  )
   const [level, setLevel] = useState(0)
   const [bars, setBars] = useState<number[]>([0, 0, 0, 0, 0])
   // True when the captured stream has stayed silent for a while — usually means
@@ -142,6 +159,86 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
     })
   }, [])
 
+  // Transcribe one VAD clip. Failures never stop the loop: a transient/rate
+  // error auto-retries the same clip once, then surfaces a Retry chip; a key
+  // error pauses attempts and points the user to Settings.
+  const transcribeClip = useCallback(
+    async (clip: Blob, isRetry = false) => {
+      if (!window.ai) return
+      if (keyErrorRef.current && !isRetry) return // don't hammer Whisper with a bad key
+      inFlightRef.current += 1
+      setTranscribing(true)
+      try {
+        const bytes = new Uint8Array(await clip.arrayBuffer())
+        const text = (await window.ai.transcribe(bytes)).trim()
+        // Success — clear any error state and process the transcript.
+        lastFailedClipRef.current = null
+        keyErrorRef.current = false
+        setLastError(null)
+        if (text) {
+          setLastTranscript(text)
+          const { isQuestion, cleanedText } = detectQuestion(text)
+          if (isQuestion) addPending(cleanedText)
+        }
+      } catch (err) {
+        const message = (err as Error)?.message ?? String(err)
+        const kind = classifyTranscribeError(message)
+        if (kind === 'key') {
+          lastFailedClipRef.current = clip
+          keyErrorRef.current = true
+          setLastError({ kind, message: transcribeErrorMessage(kind) })
+          if (!keyToastShownRef.current) {
+            keyToastShownRef.current = true
+            toast.error('Auto-listen: add a valid Groq API key in Settings → AI Provider.')
+          }
+        } else if (!isRetry) {
+          // One automatic retry for transient/rate-limit blips — keep listening.
+          const delay = kind === 'rate_limit' ? 1500 : 700
+          const t = setTimeout(() => {
+            retryTimers.current.delete(t)
+            void transcribeClip(clip, true)
+          }, delay)
+          retryTimers.current.add(t)
+        } else {
+          // The retry also failed — offer a manual Retry, keep the clip.
+          lastFailedClipRef.current = clip
+          setLastError({ kind, message: transcribeErrorMessage(kind) })
+        }
+      } finally {
+        inFlightRef.current = Math.max(0, inFlightRef.current - 1)
+        setTranscribing(inFlightRef.current > 0)
+      }
+    },
+    [addPending],
+  )
+
+  // Manual retry of the last failed clip (from the status strip).
+  const retry = useCallback(() => {
+    const clip = lastFailedClipRef.current
+    keyErrorRef.current = false
+    keyToastShownRef.current = false
+    setLastError(null)
+    if (clip) void transcribeClip(clip, true)
+  }, [transcribeClip])
+
+  // Use the latest raw transcript even if the question-filter dropped it
+  // (view-raw / submit-anyway).
+  const submitLastTranscript = useCallback(() => {
+    const t = lastTranscript.trim()
+    if (t) onQuestionRef.current(t)
+    setLastTranscript('')
+  }, [lastTranscript])
+
+  // Dismiss whatever the status strip is showing (an error or the last-heard
+  // snippet) and clear the retained failed clip / key-error gate.
+  const dismissError = useCallback(() => {
+    setLastError(null)
+    setLastTranscript('')
+    lastFailedClipRef.current = null
+    keyErrorRef.current = false
+    keyToastShownRef.current = false
+  }, [])
+
   const stopListening = useCallback(() => {
     recorderRef.current?.stop()
     recorderRef.current = null
@@ -149,10 +246,18 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
       clearInterval(levelTimer.current)
       levelTimer.current = null
     }
+    for (const t of retryTimers.current) clearTimeout(t)
+    retryTimers.current.clear()
     clearFlush()
+    inFlightRef.current = 0
+    keyErrorRef.current = false
+    keyToastShownRef.current = false
+    lastFailedClipRef.current = null
     setIsListening(false)
     setPending([])
-    setInterim('')
+    setLastTranscript('')
+    setTranscribing(false)
+    setLastError(null)
     setLevel(0)
     setBars([0, 0, 0, 0, 0])
     setSilent(false)
@@ -180,33 +285,20 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
       toast.error('Auto-listen only works in the desktop app.')
       return
     }
-    erroredRef.current = false
     heardRef.current = false
     startedAtRef.current = Date.now()
+    keyErrorRef.current = false
+    keyToastShownRef.current = false
     setSilent(false)
+    setLastError(null)
+    setLastTranscript('')
     const rec = new AudioRecorder()
     try {
       // system=true → capture loopback/system audio (the interviewer), not the mic.
       // VAD segments each complete utterance so questions aren't split mid-sentence.
+      // Each clip is transcribed independently; a failure never stops the loop.
       await rec.startVadClips((clip) => {
-        void (async () => {
-          if (erroredRef.current) return
-          try {
-            const bytes = new Uint8Array(await clip.arrayBuffer())
-            const text = (await window.ai.transcribe(bytes)).trim()
-            if (!text) return
-            setInterim(text)
-            const { isQuestion, cleanedText } = detectQuestion(text)
-            if (isQuestion) addPending(cleanedText)
-          } catch (err) {
-            if (!erroredRef.current) {
-              erroredRef.current = true
-              toast.error('Auto-listen needs a Groq API key (Settings → AI Provider).')
-              stopListening()
-            }
-            void err
-          }
-        })()
+        void transcribeClip(clip)
       }, true)
     } catch (err) {
       toast.error(`Could not capture system audio: ${(err as Error).message}`)
@@ -225,7 +317,7 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
         setSilent(true)
       }
     }, 120)
-  }, [addPending, stopListening])
+  }, [transcribeClip])
 
   // Cleanup on unmount.
   useEffect(() => () => stopListening(), [stopListening])
@@ -233,7 +325,9 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
   return {
     isListening,
     pending,
-    interim,
+    lastTranscript,
+    transcribing,
+    lastError,
     level,
     bars,
     silent,
@@ -243,5 +337,8 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
     editPending,
     ignorePending,
     combinePending,
+    retry,
+    submitLastTranscript,
+    dismissError,
   }
 }
