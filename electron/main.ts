@@ -4,7 +4,7 @@ import path from 'node:path'
 import { initDatabase, closeDatabase } from '../src/lib/database/db'
 import { registerIpcHandlers } from './ipc-handlers'
 import { setMainWindow } from './windows'
-import { enableStealth, disableStealth, isStealthActive } from './stealth-manager'
+import { enableStealth, disableStealth, isStealthActive, reassertStealth } from './stealth-manager'
 import { toggleOverlay, setOnClosed } from './overlay-manager'
 import { startReminderScheduler } from './reminder-scheduler'
 import { setupUpdater } from './updater'
@@ -93,10 +93,12 @@ function registerHotkeys() {
   })
   // Focus overlay toggle — also the recovery path while the main window is hidden.
   globalShortcut.register('CommandOrControl+Shift+H', () => toggleOverlay())
-  // Leaving the overlay (Esc/X/hotkey) must also leave stealth — never strand
-  // the user "stealthed" with a visible, picker-enumerable main window.
+  // Leaving the overlay (Esc/X/hotkey) must NOT change stealth: if it's on, keep
+  // it on and re-apply protection to the main window that just came back; if
+  // it's off, restore the dock (mac). Stealth only ends when explicitly toggled.
   setOnClosed(() => {
-    if (isStealthActive()) disableStealth()
+    if (isStealthActive()) reassertStealth()
+    else if (process.platform === 'darwin') app.dock?.show()
   })
 }
 

@@ -6,7 +6,11 @@ export function StealthToggle() {
   const [active, setActive] = useState(false)
 
   useEffect(() => {
-    if (window.stealth) void window.stealth.status().then(setActive)
+    if (!window.stealth) return
+    void window.stealth.status().then(setActive)
+    // Stay in sync when stealth is toggled elsewhere (e.g. the Focus overlay or
+    // the global Ctrl+Shift+S hotkey) so the UI never drifts from reality.
+    return window.stealth.onChange?.(setActive)
   }, [])
 
   // Cursor neutrality while stealthed: force the default arrow everywhere so

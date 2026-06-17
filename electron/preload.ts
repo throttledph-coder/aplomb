@@ -101,6 +101,13 @@ contextBridge.exposeInMainWorld('stealth', {
   enable: () => invoke('stealth:enable'),
   disable: () => invoke('stealth:disable'),
   status: () => invoke('stealth:status'),
+  // Live state broadcast so every window's toggle stays in sync with the real
+  // stealth state (toggled from either the main window or the overlay).
+  onChange: (cb: (active: boolean) => void) => {
+    const listener = (_e: unknown, active: boolean) => cb(active)
+    ipcRenderer.on('stealth:changed', listener)
+    return () => ipcRenderer.off('stealth:changed', listener)
+  },
 })
 
 // --------- App shell helpers ---------
