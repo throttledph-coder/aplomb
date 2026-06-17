@@ -101,11 +101,12 @@ export function openOverlay(): void {
   overlay.on('closed', () => {
     overlay = null
     const m = getMainWindow()
-    if (process.platform === 'darwin') app.dock?.show()
     m?.show()
     m?.focus()
     // Let the live session refresh anything asked from the overlay.
     m?.webContents.send('session:refresh')
+    // Dock + stealth re-assertion are owned by the onClosed hook (main.ts),
+    // which knows whether stealth is still active.
     onClosedCb?.()
   })
 

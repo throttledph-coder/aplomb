@@ -191,18 +191,6 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
       {/* Assistant area + notes side panel — side-by-side, chat never covered */}
       <div className="flex flex-1 overflow-hidden">
         <div className="min-w-0 flex-1 space-y-3 overflow-y-auto px-3 py-2">
-          {canAutoListen && (auto.isListening || auto.lastError) && (
-            <TranscribeStatus
-              listening={auto.isListening}
-              transcribing={auto.transcribing}
-              lastTranscript={auto.lastTranscript}
-              lastError={auto.lastError}
-              onRetry={auto.retry}
-              onSubmitLast={auto.submitLastTranscript}
-              onDismiss={auto.dismissError}
-              onOpenSettings={() => void window.overlay?.close()}
-            />
-          )}
           {qaHistory.length === 0 && !showingLive && auto.pending.length === 0 ? (
             <p className="px-2 py-6 text-center text-xs text-muted-foreground">
               Ask below — or turn on the mic and let Aplomb catch the interviewer's questions.
@@ -239,51 +227,6 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
                   )}
                 </div>
               )}
-              {auto.pending.map((p, i) => (
-                <div key={p.id} className="flex flex-col items-end gap-1">
-                  <button
-                    onClick={() => auto.usePending(p.id)}
-                    title="Answer this question"
-                    className="max-w-[90%] rounded-xl rounded-br-sm border border-dashed border-primary/60 bg-primary/10 px-2.5 py-1.5 text-left text-xs transition-colors hover:border-primary hover:bg-primary/20"
-                  >
-                    <span className="mb-0.5 block text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Heard — tap to answer
-                    </span>
-                    {p.text}
-                  </button>
-                  <div className="flex gap-0.5">
-                    <button
-                      title="Edit before asking"
-                      aria-label="Edit question"
-                      onClick={() => {
-                        const text = auto.editPending(p.id)
-                        if (text !== null) setInput(text)
-                      }}
-                      className={ICON_BTN}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </button>
-                    {i > 0 && (
-                      <button
-                        title="Combine with the heard question above"
-                        aria-label="Combine questions"
-                        onClick={() => auto.combinePending(p.id)}
-                        className={ICON_BTN}
-                      >
-                        <Merge className="h-3 w-3" />
-                      </button>
-                    )}
-                    <button
-                      title="Ignore"
-                      aria-label="Ignore question"
-                      onClick={() => auto.ignorePending(p.id)}
-                      className={ICON_BTN}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
               <div ref={bottomRef} />
             </div>
           )}
@@ -297,6 +240,68 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
           />
         )}
       </div>
+
+      {/* Heard — pinned above the composer so detected questions stay reachable
+          while scrolling the conversation. */}
+      {canAutoListen && (auto.isListening || auto.lastError || auto.pending.length > 0) && (
+        <div className="max-h-[40%] shrink-0 space-y-2 overflow-y-auto border-t px-3 py-2">
+          <TranscribeStatus
+            listening={auto.isListening}
+            transcribing={auto.transcribing}
+            lastTranscript={auto.lastTranscript}
+            lastError={auto.lastError}
+            onRetry={auto.retry}
+            onSubmitLast={auto.submitLastTranscript}
+            onDismiss={auto.dismissError}
+            onOpenSettings={() => void window.overlay?.close()}
+          />
+          {auto.pending.map((p, i) => (
+            <div key={p.id} className="flex flex-col items-end gap-1">
+              <button
+                onClick={() => auto.usePending(p.id)}
+                title="Answer this question"
+                className="max-w-[90%] rounded-xl rounded-br-sm border border-dashed border-primary/60 bg-primary/10 px-2.5 py-1.5 text-left text-xs transition-colors hover:border-primary hover:bg-primary/20"
+              >
+                <span className="mb-0.5 block text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Heard — tap to answer
+                </span>
+                {p.text}
+              </button>
+              <div className="flex gap-0.5">
+                <button
+                  title="Edit before asking"
+                  aria-label="Edit question"
+                  onClick={() => {
+                    const text = auto.editPending(p.id)
+                    if (text !== null) setInput(text)
+                  }}
+                  className={ICON_BTN}
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+                {i > 0 && (
+                  <button
+                    title="Combine with the heard question above"
+                    aria-label="Combine questions"
+                    onClick={() => auto.combinePending(p.id)}
+                    className={ICON_BTN}
+                  >
+                    <Merge className="h-3 w-3" />
+                  </button>
+                )}
+                <button
+                  title="Ignore"
+                  aria-label="Ignore question"
+                  onClick={() => auto.ignorePending(p.id)}
+                  className={ICON_BTN}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Composer */}
       <div className="shrink-0 border-t p-2">
@@ -479,7 +484,9 @@ function QuickSettings({
   })
 
   useEffect(() => {
-    if (window.stealth) void window.stealth.status().then(setStealth)
+    if (!window.stealth) return
+    void window.stealth.status().then(setStealth)
+    return window.stealth.onChange?.(setStealth)
   }, [])
 
   async function toggleStealth(on: boolean) {

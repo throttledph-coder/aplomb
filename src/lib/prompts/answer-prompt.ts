@@ -22,9 +22,9 @@ function buildCandidateContext(c?: CandidateContext): string {
 }
 
 const LENGTH_INSTRUCTIONS: Record<AnswerLength, string> = {
-  concise: 'Write a 2-3 sentence answer. ~45 seconds when spoken aloud.',
-  detailed: 'Write a full answer with context and result. ~90 seconds when spoken.',
-  comprehensive: 'Write a thorough answer covering all angles. ~2-3 minutes when spoken.',
+  concise: 'Keep it tight — 2-3 sentences, about 45 seconds spoken. Get to the point fast.',
+  detailed: 'A full answer with a bit of story and a clear result, about 90 seconds spoken.',
+  comprehensive: 'A thorough answer that covers the angles without rambling, about 2-3 minutes spoken.',
 }
 
 // Combine resume + JD + recent Q&A + question into the final user prompt (docs/06).
@@ -57,10 +57,9 @@ CURRENT INTERVIEW QUESTION:
 
 ANSWER LENGTH: ${LENGTH_INSTRUCTIONS[answerLength]}
 
-Generate the answer the candidate should speak.
-Start with a one-line bold headline (wrapped in **double asterisks**) — a scannable takeaway — then a blank
-line, then the spoken answer. No other preamble and no other bold text.
-Write naturally, as if speaking. Use "I" statements.
-Only reference what is in the candidate's resume.
+Write what the candidate should actually say out loud — natural, confident, conversational, like a real
+person in the room. No buzzwords, no clichés, no AI filler. Open with one bold hook line (in **double
+asterisks**), then a blank line, then the spoken answer; no other bold text and no preamble. First person,
+and only what's grounded in the resume.
 `.trim()
 }

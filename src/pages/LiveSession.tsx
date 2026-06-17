@@ -408,19 +408,6 @@ export default function LiveSession() {
         aria-label="Interview conversation"
         className="flex-1 space-y-3 overflow-y-auto px-1"
       >
-        {/* Live transcription status — always visible while listening. */}
-        {canAutoListen && (auto.isListening || auto.lastError) && (
-          <TranscribeStatus
-            listening={auto.isListening}
-            transcribing={auto.transcribing}
-            lastTranscript={auto.lastTranscript}
-            lastError={auto.lastError}
-            onRetry={auto.retry}
-            onSubmitLast={auto.submitLastTranscript}
-            onDismiss={auto.dismissError}
-            onOpenSettings={() => navigate('/settings')}
-          />
-        )}
         {empty ? (
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-sm text-muted-foreground">
             <Sparkles className="h-6 w-6" />
@@ -449,22 +436,38 @@ export default function LiveSession() {
                 latest
               />
             )}
-            {/* Detected (heard) questions awaiting the user's decision. */}
-            {auto.pending.map((p, i) => (
-              <PendingBubble
-                key={p.id}
-                text={p.text}
-                canCombine={i > 0}
-                onUse={() => auto.usePending(p.id)}
-                onEdit={() => editPending(p.id)}
-                onIgnore={() => auto.ignorePending(p.id)}
-                onCombine={() => auto.combinePending(p.id)}
-              />
-            ))}
             <div ref={bottomRef} />
           </div>
         )}
       </div>
+
+      {/* Heard — pinned above the composer so detected questions + transcription
+          status stay visible while scrolling back through the conversation. */}
+      {canAutoListen && (auto.isListening || auto.lastError || auto.pending.length > 0) && (
+        <div className="max-h-[38vh] shrink-0 space-y-2 overflow-y-auto rounded-lg border bg-background/40 p-2.5">
+          <TranscribeStatus
+            listening={auto.isListening}
+            transcribing={auto.transcribing}
+            lastTranscript={auto.lastTranscript}
+            lastError={auto.lastError}
+            onRetry={auto.retry}
+            onSubmitLast={auto.submitLastTranscript}
+            onDismiss={auto.dismissError}
+            onOpenSettings={() => navigate('/settings')}
+          />
+          {auto.pending.map((p, i) => (
+            <PendingBubble
+              key={p.id}
+              text={p.text}
+              canCombine={i > 0}
+              onUse={() => auto.usePending(p.id)}
+              onEdit={() => editPending(p.id)}
+              onIgnore={() => auto.ignorePending(p.id)}
+              onCombine={() => auto.combinePending(p.id)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Composer (pinned) — Claude-Code box: mic bottom-left, picker + send bottom-right */}
       <div className="shrink-0 space-y-2">

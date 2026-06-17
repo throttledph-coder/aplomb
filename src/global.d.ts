@@ -149,6 +149,8 @@ export interface ClarityStealthApi {
   enable(): Promise<void>
   disable(): Promise<void>
   status(): Promise<boolean>
+  // Subscribe to real stealth-state changes (from any window); returns unsubscribe.
+  onChange(cb: (active: boolean) => void): () => void
 }
 
 export interface LicenseResult {

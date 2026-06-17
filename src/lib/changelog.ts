@@ -9,6 +9,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.23.0',
+    date: '2026-06-17',
+    items: [
+      'Stealth now stays on when you enter or leave the Focus overlay — Esc returns to the main app without dropping stealth, and the toggle never drifts from the real state.',
+      'The Heard panel is pinned above the composer, so detected questions stay visible while you scroll the conversation.',
+      'Sharper, more natural interview answers — less scripted, no corporate buzzwords.',
+    ],
+  },
+  {
     version: '0.22.0',
     date: '2026-06-13',
     items: [
