@@ -12,6 +12,7 @@ import {
 } from './overlay-manager'
 import { checkForUpdates, downloadUpdate, quitAndInstall } from './updater'
 import { verifyLicense } from '../src/lib/license'
+import { PAYMONGO_WORKER_URL } from '../src/lib/billing/config'
 import { logError, getLogsDir } from './logger'
 import {
   generateAnswer,
@@ -153,6 +154,23 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('overlay:setOpacity', (_e, value: number) => setOverlayOpacity(value))
   ipcMain.handle('overlay:setAlwaysOnTop', (_e, on: boolean) => setOverlayAlwaysOnTop(on))
   ipcMain.handle('overlay:adjustWidth', (_e, delta: number) => adjustOverlayWidth(delta))
+
+  // Billing — create a PayMongo checkout session via the billing Worker. Done in
+  // the main process so the renderer CSP (connect-src self+supabase) is untouched.
+  ipcMain.handle('billing:createCheckout', async (_e, input: { user_id: string; email: string | null }) => {
+    if (!PAYMONGO_WORKER_URL) return { error: 'not_configured' }
+    try {
+      const res = await fetch(`${PAYMONGO_WORKER_URL}/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+      const json = (await res.json()) as { url?: string; error?: string }
+      return res.ok && json.url ? { url: json.url } : { error: json.error ?? 'checkout_failed' }
+    } catch (err) {
+      return { error: (err as Error).message }
+    }
+  })
 
   // in-app updates (electron-updater; no-op in dev)
   ipcMain.handle('updater:check', () => checkForUpdates())

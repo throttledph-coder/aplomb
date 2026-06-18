@@ -28,9 +28,9 @@ export default function Privacy() {
           edit or clear these any time in Account.
         </li>
         <li>
-          <strong>Subscription status</strong> — if you buy Pro, our payment provider (Lemon Squeezy)
-          notifies us of your subscription state (active/cancelled and renewal date), linked to your
-          account ID.
+          <strong>Pro pass status</strong> — if you buy a Pro pass, our payment processor (PayMongo)
+          notifies us that the payment succeeded so we can activate your 30-day pass, linked to your
+          account ID and its expiry date.
         </li>
       </UL>
 
@@ -43,7 +43,7 @@ export default function Privacy() {
         <li>
           Your <strong>AI API key</strong> is stored encrypted on your device and never sent to us.
         </li>
-        <li>Payment card details — these are handled entirely by Lemon Squeezy; we never see them.</li>
+        <li>Payment details — these are handled entirely by PayMongo; we never see them.</li>
       </UL>
 
       <H2>AI processing</H2>
@@ -60,7 +60,7 @@ export default function Privacy() {
           <strong>Supabase</strong> — account authentication + subscription records.
         </li>
         <li>
-          <strong>Lemon Squeezy</strong> — payments and subscription management (Merchant of Record).
+          <strong>PayMongo</strong> — payment processing for the Pro pass.
         </li>
         <li>
           <strong>Cloudflare</strong> — website hosting and the subscription webhook.

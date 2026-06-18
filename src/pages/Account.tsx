@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { RefreshCw, CreditCard, Loader2, Trash2, Download, Upload } from 'lucide-react'
-import { buildCheckoutUrl } from '@/lib/billing/config'
+import { RefreshCw, Loader2, Trash2, Download, Upload } from 'lucide-react'
+import { PRO_PRICE, PRO_PASS_DAYS } from '@/lib/billing/config'
 import { supabase } from '@/lib/supabase/client'
 import { parseExport } from '@/lib/backup'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -83,15 +83,19 @@ export default function Account() {
       ? 'Past due'
       : 'Free'
 
-  function startCheckout() {
-    if (!user) return
-    const url = buildCheckoutUrl(user.id, user.email)
-    if (!url) {
-      toast.info('Checkout is not configured yet.')
+  async function startCheckout() {
+    if (!user || !window.billing) return
+    const res = await window.billing.createCheckout({ user_id: user.id, email: user.email })
+    if (!res.url) {
+      toast.error(
+        res.error === 'not_configured'
+          ? 'Checkout is not configured yet.'
+          : 'Could not start checkout. Please try again.',
+      )
       return
     }
-    void window.app?.openExternal(url)
-    toast.info('Complete the purchase in your browser — your status updates automatically.')
+    void window.app?.openExternal(res.url)
+    toast.info('Complete the payment in your browser — your status updates automatically.')
     let ticks = 0
     const timer = setInterval(() => {
       ticks++
@@ -275,7 +279,7 @@ export default function Account() {
             </div>
             {subscriptionActive && (
               <div>
-                <p className="text-xs text-muted-foreground">Renews</p>
+                <p className="text-xs text-muted-foreground">Active until</p>
                 <p className="font-medium">{fmtDate(subscription?.current_period_end)}</p>
               </div>
             )}
@@ -283,16 +287,16 @@ export default function Account() {
 
           <p className="text-xs text-muted-foreground">
             Pro unlocks the live practice assistant (auto-listen) + focus/stealth mode. All prep
-            features are free.
+            features are free. Pro is a one-time <strong>{PRO_PRICE} / {PRO_PASS_DAYS}-day pass</strong>{' '}
+            (GCash, Maya, or card) — no auto-renew; top up anytime to extend.
           </p>
 
           <div className="flex flex-wrap gap-2">
-            {!subscriptionActive && <Button onClick={startCheckout}>Upgrade to Pro</Button>}
-            {subscriptionActive && (
-              <Button variant="outline" onClick={() => toast.info('Billing portal coming soon.')}>
-                <CreditCard className="mr-2 h-4 w-4" /> Manage billing
-              </Button>
-            )}
+            <Button onClick={() => void startCheckout()}>
+              {subscriptionActive
+                ? `Renew — ${PRO_PRICE} / ${PRO_PASS_DAYS} days`
+                : `Upgrade to Pro — ${PRO_PRICE} / ${PRO_PASS_DAYS} days`}
+            </Button>
             <Button variant="outline" onClick={() => void doRefresh()} disabled={refreshing}>
               {refreshing ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
