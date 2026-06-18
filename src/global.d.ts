@@ -153,6 +153,14 @@ export interface ClarityStealthApi {
   onChange(cb: (active: boolean) => void): () => void
 }
 
+// Billing — PayMongo checkout via the billing Worker (main-process fetch).
+export interface ClarityBillingApi {
+  createCheckout(input: { user_id: string; email: string | null }): Promise<{
+    url?: string
+    error?: string
+  }>
+}
+
 export interface LicenseResult {
   valid: boolean
   email?: string
@@ -209,6 +217,7 @@ declare global {
     parser: ClarityParserApi
     ai: ClarityAiApi
     stealth: ClarityStealthApi
+    billing: ClarityBillingApi
     license: ClarityLicenseApi
     app: ClarityAppApi
     updater: ClarityUpdaterApi

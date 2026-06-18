@@ -28,9 +28,9 @@ export default function Refund() {
 
       <H2>How to request a refund</H2>
       <P>
-        Email <Mail /> from your account email with your order details. Payments and refunds are processed
-        by our Merchant of Record, <strong>Lemon Squeezy</strong>; approved refunds are returned to your
-        original payment method.
+        Email <Mail /> from your account email with your order details. Payments are processed by{' '}
+        <strong>PayMongo</strong>; approved refunds are returned to your original payment method
+        (GCash, Maya, or card).
       </P>
 
       <H2>Contact</H2>
