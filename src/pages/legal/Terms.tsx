@@ -42,12 +42,11 @@ export default function Terms() {
         responsible for complying with the policies of any interview or meeting you participate in.
       </P>
 
-      <H2>6. Pro pass &amp; billing</H2>
+      <H2>6. Pro subscription &amp; billing</H2>
       <P>
-        Pro is sold as a one-time <strong>30-day pass</strong> (not a recurring subscription). Payments are
-        processed by <strong>PayMongo</strong> (GCash, Maya, or card); we are the seller of record. A pass
-        activates Pro for 30 days and does <strong>not</strong> auto-renew — it simply expires, and you can
-        buy another pass anytime to add 30 more days. See our{' '}
+        Pro features are offered as a recurring subscription. Payments are processed by{' '}
+        <strong>Lemon Squeezy</strong>, which acts as our Merchant of Record and handles billing, applicable
+        taxes, and receipts. Subscriptions renew automatically until cancelled. See our{' '}
         <Link to="/legal/refund" className="text-primary hover:underline">
           Refund Policy
         </Link>

@@ -96,12 +96,6 @@ contextBridge.exposeInMainWorld('ai', {
   },
 })
 
-// --------- Billing (PayMongo checkout) ---------
-contextBridge.exposeInMainWorld('billing', {
-  createCheckout: (input: { user_id: string; email: string | null }) =>
-    invoke('billing:createCheckout', input),
-})
-
 // --------- Stealth mode (premium) ---------
 contextBridge.exposeInMainWorld('stealth', {
   enable: () => invoke('stealth:enable'),

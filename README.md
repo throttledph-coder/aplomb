@@ -26,7 +26,7 @@ Groq key or run fully local with Ollama. We only store your account email + subs
 ## Tech
 
 Electron + React 18 + TypeScript, Tailwind + shadcn/ui, Zustand, better-sqlite3, Groq (LLM + Whisper),
-Supabase (auth + subscription records), PayMongo (billing — one-time Pro pass).
+Supabase (auth + subscription records), Lemon Squeezy (billing, Merchant of Record).
 
 ## Develop
 

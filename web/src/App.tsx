@@ -9,9 +9,11 @@ import { Reveal, Stagger, Item, Counter } from './reveal'
 // shows install/SmartScreen steps). The actual installer asset URL/version lives
 // in web/public/download.html — edit it there per release.
 const DOWNLOAD_PAGE = '/download.html'
-// Pro is purchased inside the app (a PayMongo checkout tied to your account).
-// The website CTA just sends visitors to the download.
-const PRO_PRICE = '₱499' // one-time 30-day pass
+// Lemon Squeezy buy-link for Aplomb Pro. Site "Get Pro" opens it in a new tab
+// (a marketing entry — per-user linking happens in-app via Account → Upgrade,
+// which appends checkout[custom][user_id] so the webhook ties it to the account).
+const PRO_CHECKOUT_URL = 'https://aplomb.lemonsqueezy.com/checkout/buy/1de6f617-107a-4a48-aebd-0d6e1bf2d213'
+const PRO_PRICE = '$9' // monthly
 const CONTACT_EMAIL = 'hello@aplomb.app'
 
 /* ---------- inline icons (coral, stroke) ---------- */
@@ -115,7 +117,7 @@ const FEATURES: Feature[] = [
 const STATS: { value: ReactNode; label: string }[] = [
   { value: <Counter to={100} suffix="%" />, label: 'Runs on your machine' },
   { value: '$0', label: 'Free forever for prep' },
-  { value: '₱499', label: 'Pro · 30-day pass' },
+  { value: '$9', label: 'Pro / month' },
   { value: '∞', label: 'Practice sessions' },
 ]
 
@@ -142,7 +144,7 @@ const FAQ = [
   { q: 'What platforms are supported?', a: 'Windows today. Mac and Linux are planned.' },
   { q: 'Is the window hidden during screen sharing?', a: 'With Stealth mode on (Windows), Aplomb uses OS screen-capture protection so its window is excluded from screen sharing and recording in apps like Zoom, Meet, and Teams, while staying visible to you. It is a privacy feature for your own setup, not a guarantee against every possible capture method.' },
   { q: 'What do I get with Pro?', a: "Live auto-listen — Aplomb transcribes the interviewer's questions in real time (Groq Whisper), lets you Use/Edit/Combine them, and can Auto-answer hands-free (detected questions combined + answered automatically) — plus the Focus overlay (a compact always-on-top assistant with a private notes panel) and stealth mode (hidden from screen-share pickers and recording). All preparation features — resume tailoring, practice answers, reports, the tracker, and the calendar — are free and unlimited." },
-  { q: 'How does billing work?', a: "Pro is a one-time 30-day pass (₱499) you buy inside the app — pay with GCash, Maya, or card through PayMongo. There's no auto-renew: it simply expires after 30 days, and you can top up anytime to add another 30 days (it stacks onto whatever's left). All prep features stay free." },
+  { q: 'How does billing work?', a: 'Pro is a monthly subscription handled by our payment provider (Lemon Squeezy), who manages taxes and receipts. Cancel anytime.' },
 ]
 
 const SECTIONS = ['features', 'stealth', 'how', 'pricing', 'faq']
@@ -400,16 +402,15 @@ export default function App() {
             <Item className="price pro">
               <span className="ribbon">Most popular</span>
               <h3>Pro</h3>
-              <div className="amt">{PRO_PRICE} <small>/ 30 days</small></div>
+              <div className="amt">{PRO_PRICE} <small>/ month</small></div>
               <ul>
                 <li>{ico.check} Everything in Free</li>
                 <li>{ico.check} Live auto-listen + answers</li>
                 <li>{ico.check} Focus overlay + private notes</li>
                 <li>{ico.check} Stealth mode (hidden from screen share)</li>
-                <li>{ico.check} GCash · Maya · Card — no auto-renew</li>
               </ul>
-              <motion.a className="btn btn-primary" href={DOWNLOAD_PAGE} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
-                Get Pro in the app {ico.arrow}
+              <motion.a className="btn btn-primary" href={PRO_CHECKOUT_URL} target="_blank" rel="noopener noreferrer" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+                Get Pro {ico.arrow}
               </motion.a>
             </Item>
           </Stagger>
