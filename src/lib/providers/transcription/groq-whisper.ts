@@ -1,7 +1,9 @@
 import Groq, { toFile } from 'groq-sdk'
 import type { AudioTranscriber } from './types'
 
-const WHISPER_MODEL = 'whisper-large-v3'
+// large-v3-turbo: ~2-4x faster than large-v3 with near-identical accuracy — the
+// balanced "fast + accurate" pick for live interview audio.
+const WHISPER_MODEL = 'whisper-large-v3-turbo'
 
 // Premium transcription via Groq Whisper. Main-process only (uses the API key).
 export class GroqWhisperTranscriber implements AudioTranscriber {

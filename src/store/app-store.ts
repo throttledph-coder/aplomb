@@ -48,6 +48,8 @@ interface AppState {
   updateProfile: (patch: Partial<ProfileInfo>) => Promise<{ ok: boolean; error?: string }>
   loadSettings: () => Promise<void>
   updateSetting: (key: string, value: string | null) => Promise<void>
+  // Apply a setting changed in ANOTHER window (no DB write, no re-broadcast).
+  applyRemoteSetting: (key: string, value: string | null) => void
   incrementSession: () => Promise<void>
   refreshActiveSession: () => Promise<void>
   initAuth: () => Promise<void>
@@ -130,6 +132,17 @@ export const useAppStore = create<AppState>((set, get) => {
 
     updateSetting: async (key, value) => {
       if (window.db) await window.db.settings.set(key, value)
+      const settings = { ...get().settings, [key]: value }
+      set({ settings, isOnboarded: deriveOnboarded(settings) })
+      recomputePlan()
+      // Tell the other window(s) so the same setting updates there live.
+      window.app?.broadcastSetting(key, value)
+    },
+
+    // A setting was changed in another window. Update local store only — the DB
+    // is already authoritative (the originating window wrote it) and we must not
+    // re-broadcast or we'd loop.
+    applyRemoteSetting: (key, value) => {
       const settings = { ...get().settings, [key]: value }
       set({ settings, isOnboarded: deriveOnboarded(settings) })
       recomputePlan()

@@ -25,6 +25,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Markdown, type MarkdownSize } from '@/components/report/Markdown'
 import { ModelPicker } from '@/components/session/ModelPicker'
+import { HeardHistory } from '@/components/session/HeardHistory'
 import { AudioBars } from '@/components/session/AudioBars'
 import { TranscribeStatus } from '@/components/session/TranscribeStatus'
 import { useSession } from '@/hooks/useSession'
@@ -113,7 +114,8 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
 
   const autoAnswer = canAutoListen && settings.auto_answer === 'true'
   const auto = useAutoListen({
-    onQuestion: (q) => void askQuestion(q, autoAnswer ? { length: 'concise' } : undefined),
+    // Honor the saved answer length for both manual and auto-answered questions.
+    onQuestion: (q) => void askQuestion(q),
     autoAnswer,
     isBusy: isGenerating,
   })
@@ -351,6 +353,17 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
               )}
             </div>
             <div className="flex items-center gap-1">
+              {canAutoListen && (
+                <HeardHistory
+                  items={auto.heardHistory}
+                  onUse={auto.answerFromHistory}
+                  onEdit={(id) => {
+                    const item = auto.heardHistory.find((p) => p.id === id)
+                    if (item) setInput(item.text)
+                  }}
+                  onClear={auto.clearHistory}
+                />
+              )}
               {/* Answer length + provider/model, same ⚙ popover as the live page. */}
               <ModelPicker />
               {isGenerating ? (

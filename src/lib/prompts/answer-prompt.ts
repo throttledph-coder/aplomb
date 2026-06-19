@@ -23,7 +23,9 @@ function buildCandidateContext(c?: CandidateContext): string {
 
 const LENGTH_INSTRUCTIONS: Record<AnswerLength, string> = {
   concise: 'Keep it tight — 2-3 sentences, about 45 seconds spoken. Get to the point fast.',
-  detailed: 'A full answer with a bit of story and a clear result, about 90 seconds spoken.',
+  detailed:
+    'A full answer of about 5-7 sentences (~90 seconds spoken): a brief situation, the action you took, ' +
+    'and a clear result. Tell the whole arc — do not cut it short.',
   comprehensive: 'A thorough answer that covers the angles without rambling, about 2-3 minutes spoken.',
 }
 

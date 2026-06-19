@@ -115,6 +115,15 @@ contextBridge.exposeInMainWorld('app', {
   openExternal: (url: string) => invoke('app:openExternal', url),
   logError: (scope: string, message: string) => invoke('app:logError', scope, message),
   openLogs: () => invoke('app:openLogs'),
+  // Relay a changed setting to every other window so answer length / provider /
+  // model (and any setting) stay in sync across the main app and the overlay.
+  broadcastSetting: (key: string, value: string | null) =>
+    invoke('settings:broadcast', key, value),
+  onSettingChanged: (cb: (change: { key: string; value: string | null }) => void) => {
+    const listener = (_e: unknown, change: { key: string; value: string | null }) => cb(change)
+    ipcRenderer.on('settings:changed', listener)
+    return () => ipcRenderer.off('settings:changed', listener)
+  },
   // Fired by the reminder scheduler when the user clicks an interview toast.
   onInterviewNavigate: (cb: (id: number) => void) => {
     const listener = (_e: unknown, id: number) => cb(id)
