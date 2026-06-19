@@ -9,13 +9,6 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '0.24.0',
-    date: '2026-06-17',
-    items: [
-      'Pro is now a one-time ₱499 / 30-day pass paid with GCash, Maya, or card (PayMongo) — no auto-renew; top up anytime to extend.',
-    ],
-  },
-  {
     version: '0.23.0',
     date: '2026-06-17',
     items: [

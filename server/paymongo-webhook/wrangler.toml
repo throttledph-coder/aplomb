@@ -1,9 +1,0 @@
-name = "aplomb-paymongo-webhook"
-main = "src/index.ts"
-compatibility_date = "2026-01-01"
-
-# Secrets are set with `wrangler secret put <NAME>` (NEVER commit them, never paste in chat):
-#   wrangler secret put PAYMONGO_SECRET_KEY        # sk_live_… (or sk_test_… first) — used to create checkout sessions
-#   wrangler secret put PAYMONGO_WEBHOOK_SECRET    # whsk_…  — shown when you create the webhook in PayMongo
-#   wrangler secret put SUPABASE_URL               # https://<ref>.supabase.co
-#   wrangler secret put SUPABASE_SERVICE_ROLE_KEY  # Supabase service_role (admin) key
