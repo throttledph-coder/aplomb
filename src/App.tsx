@@ -52,12 +52,19 @@ function RequireOnboarding() {
 export default function App() {
   const loadSettings = useAppStore((s) => s.loadSettings)
   const initAuth = useAppStore((s) => s.initAuth)
+  const applyRemoteSetting = useAppStore((s) => s.applyRemoteSetting)
   const theme = useAppStore((s) => s.settings.theme)
 
   useEffect(() => {
     loadSettings()
     void initAuth()
   }, [loadSettings, initAuth])
+
+  // Keep settings in sync across windows (main app ↔ Focus overlay): when a
+  // setting changes in another window, apply it here without re-broadcasting.
+  useEffect(() => {
+    return window.app?.onSettingChanged(({ key, value }) => applyRemoteSetting(key, value))
+  }, [applyRemoteSetting])
 
   useEffect(() => {
     // Default to dark (settings seed theme=dark) until a light preference is set.

@@ -1,4 +1,4 @@
-import { ipcMain, shell } from 'electron'
+import { ipcMain, shell, BrowserWindow } from 'electron'
 import * as q from '../src/lib/database/queries'
 import { parseResumeFile, parseResumeText } from '../src/lib/parsers/resume-parser'
 import { enableStealth, disableStealth, isStealthActive } from './stealth-manager'
@@ -163,6 +163,17 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('stealth:enable', () => enableStealth())
   ipcMain.handle('stealth:disable', () => disableStealth())
   ipcMain.handle('stealth:status', () => isStealthActive())
+
+  // Live settings sync: a setting changed in one window (main Settings, live
+  // composer, or the overlay) is relayed to every OTHER window so all surfaces
+  // stay in sync without a reload. Mirrors the stealth `stealth:changed` pattern.
+  ipcMain.handle('settings:broadcast', (e, key: string, value: string | null) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed() && w.webContents.id !== e.sender.id) {
+        w.webContents.send('settings:changed', { key, value })
+      }
+    }
+  })
 
   // Pro licensing (offline Ed25519-signed keys)
   ipcMain.handle('license:activate', (_e, key: string) => {

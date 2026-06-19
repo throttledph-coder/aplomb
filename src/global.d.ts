@@ -176,6 +176,9 @@ export interface ClarityAppApi {
   onApplicationNavigate(cb: (id: number) => void): () => void
   // Fired in the main window when the Focus overlay closes.
   onSessionRefresh(cb: () => void): () => void
+  // Relay a changed setting to every other window (live cross-window sync).
+  broadcastSetting(key: string, value: string | null): Promise<void>
+  onSettingChanged(cb: (change: { key: string; value: string | null }) => void): () => void
 }
 
 // Focus overlay (stealth surface) controls.

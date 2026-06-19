@@ -33,6 +33,7 @@ import { SessionHeader } from '@/components/session/SessionHeader'
 import { StealthToggle } from '@/components/session/StealthToggle'
 import { AudioBars } from '@/components/session/AudioBars'
 import { ModelPicker } from '@/components/session/ModelPicker'
+import { HeardHistory } from '@/components/session/HeardHistory'
 import { TranscribeStatus } from '@/components/session/TranscribeStatus'
 import { Markdown, type MarkdownSize } from '@/components/report/Markdown'
 // Quiet h-6 icon button used across the composer bar, bubble actions, and
@@ -259,9 +260,9 @@ export default function LiveSession() {
   // so a stale `auto_answer='true'` can never drive it for a free/lapsed user.
   const autoAnswer = canAutoListen && settings.auto_answer === 'true'
   const auto = useAutoListen({
-    // Auto-answer keeps answers concise (less to scan live); manual asks use the
-    // user's saved answer length.
-    onQuestion: (q) => void askQuestion(q, autoAnswer ? { length: 'concise' } : undefined),
+    // Manual AND auto-answered questions both use the user's saved answer length
+    // (no concise override — honor whatever they picked in Settings/⚙).
+    onQuestion: (q) => void askQuestion(q),
     autoAnswer,
     isBusy: isGenerating,
   })
@@ -299,6 +300,15 @@ export default function LiveSession() {
     const text = auto.editPending(id)
     if (text === null) return
     setComposerInput(text)
+    requestAnimationFrame(() => composerRef.current?.focus())
+  }
+
+  // Load a question picked from the history popover into the composer (history
+  // is a log — the item stays put).
+  function editFromHistory(id: string) {
+    const item = auto.heardHistory.find((p) => p.id === id)
+    if (!item) return
+    setComposerInput(item.text)
     requestAnimationFrame(() => composerRef.current?.focus())
   }
 
@@ -538,7 +548,17 @@ export default function LiveSession() {
             </div>
           }
           rightControls={
-            <ModelPicker onHelp={canAutoListen ? () => setHelpOpen(true) : undefined} />
+            <>
+              {canAutoListen && (
+                <HeardHistory
+                  items={auto.heardHistory}
+                  onUse={auto.answerFromHistory}
+                  onEdit={editFromHistory}
+                  onClear={auto.clearHistory}
+                />
+              )}
+              <ModelPicker onHelp={canAutoListen ? () => setHelpOpen(true) : undefined} />
+            </>
           }
         />
         <p className="text-center text-[11px] text-muted-foreground">

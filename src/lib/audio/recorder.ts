@@ -85,7 +85,15 @@ export class AudioRecorder {
     await this.openAudio(system)
     this.clipActive = true
 
-    const START = 0.02 // speech-onset level threshold (matches the silent-detector)
+    // Speech/noise gating (all tunable). A segment only starts after a couple of
+    // consecutive loud polls (rejects keyboard clacks/clicks), the gate floats
+    // above a rolling noise-floor estimate (handles a steady-noisy room), and a
+    // finished segment is only emitted if it actually held speech-level energy
+    // (drops noise-only clips → fewer Whisper calls + fewer hallucinations).
+    const START = 0.045 // base speech-onset level threshold
+    const MARGIN = 0.03 // how far above the noise floor counts as speech
+    const ONSET_POLLS = 2 // consecutive loud polls required to open a segment
+    const MIN_LOUD_FRAMES = 3 // a real utterance has at least this many loud polls
     const SILENCE_MS = 900 // pause that ends an utterance
     const MIN_MS = 1200 // ignore ultra-short blips
     const MAX_MS = 14000 // hard cap so a long monologue still flushes
@@ -95,16 +103,25 @@ export class AudioRecorder {
     let parts: Blob[] = []
     let segStart = 0
     let lastLoud = 0
+    let onsetCount = 0 // consecutive loud polls while idle
+    let loudFrames = 0 // loud polls within the current segment
+    let segPeak = 0 // peak level within the current segment
+    let noiseFloor = START // EMA of the ambient (non-speech) level
 
     const beginSeg = () => {
       if (!this.stream) return
       parts = []
+      loudFrames = 0
+      segPeak = 0
       const r = new MediaRecorder(this.stream)
       r.ondataavailable = (e) => {
         if (e.data.size > 0) parts.push(e.data)
       }
       r.onstop = () => {
-        if (parts.length > 0) onClip(new Blob(parts, { type: r.mimeType || 'audio/webm' }))
+        const wasSpeech = loudFrames >= MIN_LOUD_FRAMES && segPeak >= noiseFloor + MARGIN
+        if (wasSpeech && parts.length > 0) {
+          onClip(new Blob(parts, { type: r.mimeType || 'audio/webm' }))
+        }
         if (rec === r) rec = null
       }
       rec = r
@@ -115,18 +132,36 @@ export class AudioRecorder {
     }
 
     const endSeg = () => {
-      if (rec && rec.state === 'recording') rec.stop() // onstop → onClip
+      if (rec && rec.state === 'recording') rec.stop() // onstop → maybe onClip
     }
 
     this.vadPoll = setInterval(() => {
       if (!this.clipActive || !this.stream) return
       const lvl = this.getAudioLevel()
       const now = Date.now()
+      const gate = Math.max(START, noiseFloor + MARGIN)
+
       if (!rec) {
-        if (lvl > START) beginSeg()
+        // Idle: adapt the noise floor toward ambient and require a sustained onset.
+        if (lvl > gate) {
+          onsetCount += 1
+          if (onsetCount >= ONSET_POLLS) {
+            onsetCount = 0
+            beginSeg()
+          }
+        } else {
+          onsetCount = 0
+          noiseFloor = noiseFloor * 0.95 + lvl * 0.05
+        }
         return
       }
-      if (lvl > START) lastLoud = now
+
+      // In a segment: measure speech energy, extend on speech, end on a pause.
+      if (lvl > gate) {
+        lastLoud = now
+        loudFrames += 1
+        if (lvl > segPeak) segPeak = lvl
+      }
       const dur = now - segStart
       if (dur >= MAX_MS) {
         endSeg() // cap reached; next poll re-opens a segment if still talking

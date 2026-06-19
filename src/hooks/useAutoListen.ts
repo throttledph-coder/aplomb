@@ -11,10 +11,13 @@ import {
 const MAX_PENDING = 6
 const FLUSH_MS = 3500 // quiet window after the last detected question before auto-answering
 const RETRY_MS = 700 // re-check interval while a previous answer is still streaming
+const PENDING_TTL_MS = 10000 // a Heard card self-clears from the strip after this
+const MAX_HISTORY = 50 // cap on the durable heard-history log
 
 export interface PendingQuestion {
   id: string
   text: string
+  addedAt: number
 }
 
 // Join all currently-pending detected questions into one prompt (trim + drop blanks).
@@ -40,6 +43,7 @@ export interface UseAutoListenOptions {
 export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }: UseAutoListenOptions) {
   const recorderRef = useRef<AudioRecorder | null>(null)
   const levelTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const sweepTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const heardRef = useRef(false)
   const startedAtRef = useRef(0)
 
@@ -65,6 +69,9 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
 
   const [isListening, setIsListening] = useState(false)
   const [pending, setPending] = useState<PendingQuestion[]>([])
+  // Durable log of every detected question — survives auto-dismiss + stop/restart
+  // of the mic, so the user can revisit and answer an earlier one (history popover).
+  const [heardHistory, setHeardHistory] = useState<PendingQuestion[]>([])
   const [lastTranscript, setLastTranscript] = useState('')
   const [transcribing, setTranscribing] = useState(false)
   const [lastError, setLastError] = useState<{ kind: TranscribeErrorKind; message: string } | null>(
@@ -110,11 +117,19 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
 
   const addPending = useCallback(
     (text: string) => {
+      const now = Date.now()
       setPending((prev) => {
         const last = prev[prev.length - 1]
         if (last && last.text.trim().toLowerCase() === text.trim().toLowerCase()) return prev
-        const next = [...prev, { id: crypto.randomUUID(), text }]
+        const next = [...prev, { id: crypto.randomUUID(), text, addedAt: now }]
         return next.length > MAX_PENDING ? next.slice(next.length - MAX_PENDING) : next
+      })
+      // Append to the durable history log (dedupe consecutive repeats, cap size).
+      setHeardHistory((prev) => {
+        const last = prev[prev.length - 1]
+        if (last && last.text.trim().toLowerCase() === text.trim().toLowerCase()) return prev
+        const next = [...prev, { id: crypto.randomUUID(), text, addedAt: now }]
+        return next.length > MAX_HISTORY ? next.slice(next.length - MAX_HISTORY) : next
       })
       // Re-arm the quiet window on every new detected question so a multi-part
       // question waits for a pause, then answers once.
@@ -122,6 +137,15 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
     },
     [armFlush],
   )
+
+  // Answer an earlier item picked from the history popover (history is a log —
+  // it stays put so the user can pick another).
+  const answerFromHistory = useCallback((id: string) => {
+    const item = heardHistory.find((p) => p.id === id)
+    if (item) onQuestionRef.current(item.text)
+  }, [heardHistory])
+
+  const clearHistory = useCallback(() => setHeardHistory([]), [])
 
   const usePending = useCallback(
     (id: string) => {
@@ -246,6 +270,10 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
       clearInterval(levelTimer.current)
       levelTimer.current = null
     }
+    if (sweepTimer.current !== null) {
+      clearInterval(sweepTimer.current)
+      sweepTimer.current = null
+    }
     for (const t of retryTimers.current) clearTimeout(t)
     retryTimers.current.clear()
     clearFlush()
@@ -306,6 +334,15 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
     }
     recorderRef.current = rec
     setIsListening(true)
+    // Self-clear Heard cards from the pinned strip after their TTL (they remain
+    // in the history popover). Applies in manual and auto-answer mode alike.
+    sweepTimer.current = setInterval(() => {
+      const cutoff = Date.now() - PENDING_TTL_MS
+      setPending((prev) => {
+        const next = prev.filter((p) => p.addedAt > cutoff)
+        return next.length === prev.length ? prev : next
+      })
+    }, 1000)
     levelTimer.current = setInterval(() => {
       const lvl = rec.getAudioLevel()
       setLevel(lvl)
@@ -325,6 +362,7 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
   return {
     isListening,
     pending,
+    heardHistory,
     lastTranscript,
     transcribing,
     lastError,
@@ -337,6 +375,8 @@ export function useAutoListen({ onQuestion, autoAnswer = false, isBusy = false }
     editPending,
     ignorePending,
     combinePending,
+    answerFromHistory,
+    clearHistory,
     retry,
     submitLastTranscript,
     dismissError,
