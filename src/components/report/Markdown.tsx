@@ -81,7 +81,27 @@ export function Markdown({ text, size = 'sm', tone = 'muted' }: MarkdownProps) {
     bullets = []
   }
 
-  for (const raw of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i]
+    // Fenced code block: collect verbatim lines until the closing ``` (mono pre).
+    if (raw.trim().startsWith('```')) {
+      flushBullets()
+      const code: string[] = []
+      i++
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        code.push(lines[i])
+        i++
+      }
+      blocks.push(
+        <pre
+          key={key++}
+          className="my-2 overflow-x-auto rounded-md border bg-muted/50 p-3 text-xs leading-relaxed"
+        >
+          <code className="font-mono text-foreground">{code.join('\n')}</code>
+        </pre>,
+      )
+      continue
+    }
     const line = raw.trim()
     if (!line) {
       flushBullets()

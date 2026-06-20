@@ -20,6 +20,7 @@ import {
   buildExtractJobPrompt,
 } from '../prompts/extract-job-prompt'
 import { CORE_SYSTEM_PROMPT, REPORT_SYSTEM_PROMPT } from '../prompts/system-prompt'
+import { SOLVE_SYSTEM_PROMPT, buildSolvePrompt } from '../prompts/solve-prompt'
 import { languageLabel, isFixedLanguage } from '../i18n/languages'
 import { GroqProvider } from './ai/groq'
 import { OllamaProvider } from './ai/ollama'
@@ -99,6 +100,30 @@ export async function streamAnswer(
 ): Promise<string> {
   return getAIProvider().stream(
     { system: CORE_SYSTEM_PROMPT, user: buildAnswerUserPrompt(input) },
+    onToken,
+    signal,
+  )
+}
+
+// Groq vision model for the coding-interview "solve from screenshot" feature.
+const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
+
+// Stream a coding-interview solution from a screenshot of the candidate's screen.
+// Vision needs Groq, so this always uses the saved Groq key + a vision model (the
+// chosen AI provider/model for text answers is independent).
+export async function solveScreenshot(
+  imageDataUrl: string,
+  onToken: (token: string) => void,
+  signal?: AbortSignal,
+): Promise<string> {
+  const apiKey = getSetting('groq_api_key') ?? ''
+  const provider = new GroqProvider({ apiKey, model: VISION_MODEL })
+  return provider.stream(
+    {
+      system: SOLVE_SYSTEM_PROMPT,
+      user: buildSolvePrompt(resolveAnswerLanguage()),
+      images: [imageDataUrl],
+    },
     onToken,
     signal,
   )

@@ -9,6 +9,7 @@ import {
   setOverlayOpacity,
   setOverlayAlwaysOnTop,
   adjustOverlayWidth,
+  captureScreenshot,
 } from './overlay-manager'
 import { checkForUpdates, downloadUpdate, quitAndInstall } from './updater'
 import { verifyLicense } from '../src/lib/license'
@@ -16,6 +17,7 @@ import { logError, getLogsDir } from './logger'
 import {
   generateAnswer,
   streamAnswer,
+  solveScreenshot,
   generateReport,
   testConnection,
   transcribe,
@@ -132,6 +134,20 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ai:cancelStream', () => {
     activeStream?.abort()
   })
+  // Coding-interview solver: stream a solution from a screen capture (vision).
+  ipcMain.handle('ai:solveScreenshot', async (e, id: string, imageDataUrl: string) => {
+    const controller = new AbortController()
+    activeStream = controller
+    try {
+      return await solveScreenshot(
+        imageDataUrl,
+        (token) => e.sender.send('ai:token', { id, token }),
+        controller.signal,
+      )
+    } finally {
+      if (activeStream === controller) activeStream = null
+    }
+  })
   ipcMain.handle('ai:generateReport', (_e, input: GenerateReportInput) => generateReport(input))
   ipcMain.handle('ai:testConnection', (_e, override?: Parameters<typeof testConnection>[0]) =>
     testConnection(override),
@@ -153,6 +169,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('overlay:setOpacity', (_e, value: number) => setOverlayOpacity(value))
   ipcMain.handle('overlay:setAlwaysOnTop', (_e, on: boolean) => setOverlayAlwaysOnTop(on))
   ipcMain.handle('overlay:adjustWidth', (_e, delta: number) => adjustOverlayWidth(delta))
+  ipcMain.handle('overlay:captureScreen', () => captureScreenshot())
 
   // in-app updates (electron-updater; no-op in dev)
   ipcMain.handle('updater:check', () => checkForUpdates())

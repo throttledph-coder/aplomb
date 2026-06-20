@@ -51,6 +51,8 @@ export interface GenerateReportInput {
 export interface ClarityAiApi {
   generateAnswer(input: GenerateAnswerInput): Promise<string>
   streamAnswer(input: GenerateAnswerInput, onToken: (token: string) => void): Promise<string>
+  // Coding-interview solver: stream a solution from a screenshot data URL.
+  solveScreenshot(imageDataUrl: string, onToken: (token: string) => void): Promise<string>
   cancelStream(): Promise<void>
   generateReport(input: GenerateReportInput): Promise<string>
   testConnection(override?: {
@@ -189,6 +191,8 @@ export interface ClarityOverlayApi {
   setOpacity(value: number): Promise<void>
   setAlwaysOnTop(on: boolean): Promise<void>
   adjustWidth(delta: number): Promise<void>
+  // Capture the primary screen as a PNG data URL (for the coding solver).
+  captureScreen(): Promise<string | null>
 }
 
 export interface UpdaterEvent {
