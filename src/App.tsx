@@ -8,6 +8,7 @@ import { useAppStore } from '@/store/app-store'
 import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
 import History from '@/pages/History'
+import Practice from '@/pages/Practice'
 import ResumeManager from '@/pages/ResumeManager'
 import Settings from '@/pages/Settings'
 import Onboarding from '@/pages/Onboarding'
@@ -87,6 +88,7 @@ export default function App() {
           <Route element={<RequireOnboarding />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/history" element={<History />} />
+            <Route path="/practice" element={<Practice />} />
             <Route path="/applications" element={<Applications />} />
             <Route path="/applications/:id" element={<ApplicationDetail />} />
             <Route path="/calendar" element={<Calendar />} />
