@@ -34,7 +34,9 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="grid grid-cols-6 gap-2">
+    // Columns keep a readable min width and the board scrolls horizontally on a
+    // narrow window; they grow to fill on a wide one.
+    <div className="grid grid-cols-[repeat(6,minmax(150px,1fr))] gap-2 overflow-x-auto pb-2">
       {APPLICATION_STATUSES.map((s) => {
         const items = apps.filter((a) => a.status === s.value)
         const rejected = s.value === 'rejected'
