@@ -1,0 +1,52 @@
+# Build the macOS app in CI on the free GitHub-hosted macOS runner so Mac users
+# can install Aplomb. The app is UNSIGNED (no Apple Developer account = $0), so on
+# first launch macOS Gatekeeper will block it — users right-click the app →
+# "Open", or run `xattr -cr /Applications/Aplomb.app`.
+#
+# Manual dispatch only. It builds and uploads the dmg/zip as a workflow ARTIFACT
+# (downloadable from the run page) — it does NOT publish a public release. This
+# lets the macOS build be downloaded and tested before any mac release ships.
+name: Build macOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch or tag to build (default: main)'
+        required: false
+        default: main
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      # tsc + vite build + electron-builder --mac, WITHOUT publishing (held).
+      # CSC_IDENTITY_AUTO_DISCOVERY=false → build unsigned instead of failing when
+      # no signing identity is present.
+      - name: Build macOS app (unsigned, no publish)
+        run: npm run build -- --mac --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload macOS build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aplomb-mac
+          path: |
+            release/**/*.dmg
+            release/**/*.zip
+            release/**/latest-mac.yml
+            release/**/*.blockmap
+          if-no-files-found: error

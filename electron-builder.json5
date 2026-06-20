@@ -26,10 +26,13 @@
     "**/node_modules/better-sqlite3/**"
   ],
   "mac": {
+    // dmg for first install; zip is required for electron-updater on macOS
+    // (latest-mac.yml references the zip). Unsigned for now — see build-mac.yml.
     "target": [
-      "dmg"
+      "dmg",
+      "zip"
     ],
-    "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
+    "artifactName": "${productName}-Mac-${version}-${arch}.${ext}"
   },
   "win": {
     "icon": "build/icon.png",
