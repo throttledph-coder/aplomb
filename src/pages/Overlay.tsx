@@ -11,6 +11,8 @@ import {
   Merge,
   Eye,
   Copy,
+  Code,
+  Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -121,6 +123,9 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
   })
 
   const [input, setInput] = useState('')
+  // Coding-interview solver: a screenshot → vision model → streamed solution.
+  const [solveText, setSolveText] = useState('')
+  const [solving, setSolving] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
   const [notesWidth, setNotesWidth] = useState(() => {
     const w = Number(settings.overlay_notes_width ?? '260')
@@ -164,6 +169,27 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
     toast.success('Copied.')
   }
 
+  // Capture the screen behind the overlay and stream a coding solution. The
+  // overlay is content-protected, so it shows black in the grab — only the
+  // problem behind it is sent.
+  async function solveScreen() {
+    if (solving || !window.overlay || !window.ai) return
+    setSolving(true)
+    setSolveText('')
+    try {
+      const img = await window.overlay.captureScreen()
+      if (!img) {
+        toast.error('Could not capture the screen.')
+        return
+      }
+      await window.ai.solveScreenshot(img, (t) => setSolveText((p) => p + t))
+    } catch (err) {
+      toast.error(`Solve failed: ${(err as Error).message}`)
+    } finally {
+      setSolving(false)
+    }
+  }
+
   return (
     <>
       {/* Drag header — generic chrome, no branding (stealth surface). */}
@@ -193,7 +219,46 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
       {/* Assistant area + notes side panel — side-by-side, chat never covered */}
       <div className="flex flex-1 overflow-hidden">
         <div className="min-w-0 flex-1 space-y-3 overflow-y-auto px-3 py-2">
-          {qaHistory.length === 0 && !showingLive && auto.pending.length === 0 ? (
+          {(solving || solveText) && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-2">
+              <div className="mb-1 flex items-center gap-1.5">
+                <Code className="h-3.5 w-3.5 text-primary" />
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Coding solution
+                </span>
+                <span className="flex-1" />
+                {solveText && (
+                  <button
+                    title="Copy solution"
+                    aria-label="Copy solution"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(solveText)
+                      toast.success('Copied.')
+                    }}
+                    className={ICON_BTN}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                )}
+                <button
+                  title="Dismiss"
+                  aria-label="Dismiss solution"
+                  onClick={() => setSolveText('')}
+                  className={ICON_BTN}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+              {solveText ? (
+                <Markdown text={solveText} size="sm" tone="normal" />
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" /> Reading the screen…
+                </span>
+              )}
+            </div>
+          )}
+          {qaHistory.length === 0 && !showingLive && auto.pending.length === 0 && !solveText && !solving ? (
             <p className="px-2 py-6 text-center text-xs text-muted-foreground">
               Ask below — or turn on the mic and let Aplomb catch the interviewer's questions.
             </p>
@@ -324,6 +389,20 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
           />
           <div className="flex items-center justify-between pl-0.5">
             <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                title="Solve the coding problem on screen"
+                aria-label="Solve coding problem"
+                onClick={() => void solveScreen()}
+                disabled={solving}
+                className={cn(ICON_BTN, solving && 'text-primary')}
+              >
+                {solving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Code className="h-3.5 w-3.5" />
+                )}
+              </button>
               {canAutoListen && (
                 <>
                   <button

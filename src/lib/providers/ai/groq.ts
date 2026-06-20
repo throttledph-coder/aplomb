@@ -31,9 +31,21 @@ export class GroqProvider implements AIProvider {
   }
 
   private messages(req: CompletionRequest) {
+    // Multimodal user turn when images are attached (vision models only):
+    // content becomes an array of text + image_url blocks. Plain string otherwise.
+    const userContent =
+      req.images && req.images.length > 0
+        ? [
+            { type: 'text' as const, text: req.user },
+            ...req.images.map((url) => ({
+              type: 'image_url' as const,
+              image_url: { url },
+            })),
+          ]
+        : req.user
     return [
       { role: 'system' as const, content: req.system },
-      { role: 'user' as const, content: req.user },
+      { role: 'user' as const, content: userContent },
     ]
   }
 

@@ -94,6 +94,17 @@ contextBridge.exposeInMainWorld('ai', {
       .invoke('ai:streamAnswer', id, input)
       .finally(() => ipcRenderer.off('ai:token', listener))
   },
+  // Coding-interview solver: stream a solution from a screenshot data URL.
+  solveScreenshot: (imageDataUrl: string, onToken: (token: string) => void) => {
+    const id = crypto.randomUUID()
+    const listener = (_e: unknown, payload: { id: string; token: string }) => {
+      if (payload.id === id) onToken(payload.token)
+    }
+    ipcRenderer.on('ai:token', listener)
+    return ipcRenderer
+      .invoke('ai:solveScreenshot', id, imageDataUrl)
+      .finally(() => ipcRenderer.off('ai:token', listener))
+  },
 })
 
 // --------- Stealth mode (premium) ---------
@@ -152,6 +163,7 @@ contextBridge.exposeInMainWorld('overlay', {
   setOpacity: (value: number) => invoke('overlay:setOpacity', value),
   setAlwaysOnTop: (on: boolean) => invoke('overlay:setAlwaysOnTop', on),
   adjustWidth: (delta: number) => invoke('overlay:adjustWidth', delta),
+  captureScreen: (): Promise<string | null> => invoke('overlay:captureScreen'),
 })
 
 // --------- In-app updates (electron-updater) ---------

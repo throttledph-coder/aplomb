@@ -8,6 +8,9 @@ export interface CompletionRequest {
   model?: string
   temperature?: number
   maxTokens?: number
+  // Optional image data URLs for multimodal (vision) requests, e.g. a screenshot
+  // of a coding problem. Only honored by providers/models that support vision.
+  images?: string[]
 }
 
 export interface ConnectionResult {

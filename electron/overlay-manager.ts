@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen } from 'electron'
+import { app, BrowserWindow, screen, desktopCapturer } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { getMainWindow } from './windows'
@@ -145,6 +145,27 @@ export function setOverlayOpacity(value: number): void {
 
 export function setOverlayAlwaysOnTop(on: boolean): void {
   if (overlay && !overlay.isDestroyed()) overlay.setAlwaysOnTop(on, 'screen-saver')
+}
+
+// Capture the primary display as a PNG data URL for the coding-interview solver.
+// The overlay is content-protected, so it renders BLACK in the grab — the coding
+// problem behind it is captured, Aplomb itself isn't. Width is capped so the
+// payload stays reasonable while keeping code text legible.
+export async function captureScreenshot(): Promise<string | null> {
+  const display = screen.getPrimaryDisplay()
+  const scale = display.scaleFactor || 1
+  const fullWidth = Math.round(display.size.width * scale)
+  const fullHeight = Math.round(display.size.height * scale)
+  const width = Math.min(fullWidth, 1920)
+  const height = Math.round((width / fullWidth) * fullHeight)
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: { width, height },
+  })
+  const src =
+    sources.find((s) => String(s.display_id) === String(display.id)) ?? sources[0]
+  if (!src || src.thumbnail.isEmpty()) return null
+  return src.thumbnail.toDataURL()
 }
 
 // Grow/shrink the window width (e.g. the Notes side panel opening/closing) so
