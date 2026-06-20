@@ -30,6 +30,8 @@ const LENGTH_INSTRUCTIONS: Record<AnswerLength, string> = {
 }
 
 // Combine resume + JD + recent Q&A + question into the final user prompt (docs/06).
+// `answerLanguage` (a human label, e.g. "Filipino") forces the spoken answer into
+// that language; undefined → answer in the question's own language.
 export function buildAnswerPrompt(
   question: string,
   resumeContext: string,
@@ -37,7 +39,11 @@ export function buildAnswerPrompt(
   previousQA: PreviousQA[],
   answerLength: AnswerLength,
   candidate?: CandidateContext,
+  answerLanguage?: string,
 ): string {
+  const languageLine = answerLanguage
+    ? `\nLANGUAGE: Write the entire answer in ${answerLanguage}. The bold hook line too.\n`
+    : ''
   const previousContext =
     previousQA.length > 0
       ? `\nPREVIOUS Q&A IN THIS SESSION (do not repeat the same stories):
@@ -58,7 +64,7 @@ CURRENT INTERVIEW QUESTION:
 "${question}"
 
 ANSWER LENGTH: ${LENGTH_INSTRUCTIONS[answerLength]}
-
+${languageLine}
 Write what the candidate should actually say out loud — natural, confident, conversational, like a real
 person in the room. No buzzwords, no clichés, no AI filler. Open with one bold hook line (in **double
 asterisks**), then a blank line, then the spoken answer; no other bold text and no preamble. First person,

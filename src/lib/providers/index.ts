@@ -20,6 +20,7 @@ import {
   buildExtractJobPrompt,
 } from '../prompts/extract-job-prompt'
 import { CORE_SYSTEM_PROMPT, REPORT_SYSTEM_PROMPT } from '../prompts/system-prompt'
+import { languageLabel, isFixedLanguage } from '../i18n/languages'
 import { GroqProvider } from './ai/groq'
 import { OllamaProvider } from './ai/ollama'
 import { GroqWhisperTranscriber } from './transcription/groq-whisper'
@@ -55,6 +56,14 @@ function resolveLength(length?: AnswerLength): AnswerLength {
   return 'detailed'
 }
 
+// The interview language (one setting drives both transcription + answers).
+// Returns a human label to write answers in, or undefined for 'auto' (match the
+// question's own language).
+function resolveAnswerLanguage(): string | undefined {
+  const code = getSetting('interview_language')
+  return isFixedLanguage(code) ? languageLabel(code) : undefined
+}
+
 export interface GenerateAnswerInput {
   question: string
   resume: ParsedResumeData
@@ -72,6 +81,7 @@ function buildAnswerUserPrompt(input: GenerateAnswerInput): string {
     input.previousQA ?? [],
     resolveLength(input.answerLength),
     input.candidate,
+    resolveAnswerLanguage(),
   )
 }
 
@@ -114,10 +124,12 @@ export function testConnection(override?: ProviderOverride): Promise<ConnectionR
   return getAIProvider(override ?? {}).testConnection()
 }
 
-// Premium transcription (Groq Whisper) — uses the saved Groq key.
+// Premium transcription (Groq Whisper) — uses the saved Groq key and the chosen
+// interview language ('auto' → Whisper auto-detects).
 export function transcribe(audio: Uint8Array): Promise<string> {
   const apiKey = getSetting('groq_api_key') ?? ''
-  return new GroqWhisperTranscriber(apiKey).transcribe(audio)
+  const language = getSetting('interview_language') ?? 'auto'
+  return new GroqWhisperTranscriber(apiKey).transcribe(audio, language)
 }
 
 // List locally-installed Ollama models (free, local).

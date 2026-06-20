@@ -13,7 +13,8 @@ export interface ContinuousRecognizer {
 }
 
 // One-shot transcription of an audio blob — Groq Whisper (premium, main process).
+// `language` is an ISO-639-1 code; omit/undefined → Whisper auto-detects.
 export interface AudioTranscriber {
   readonly name: string
-  transcribe(audio: Uint8Array): Promise<string>
+  transcribe(audio: Uint8Array, language?: string): Promise<string>
 }

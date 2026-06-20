@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAppStore } from '@/store/app-store'
+import { LANGUAGES } from '@/lib/i18n/languages'
 
 // Curated Groq chat models (current + stable). The active value is always
 // included even if not in this list.
@@ -68,6 +69,7 @@ export function ModelPicker({ onHelp }: { onHelp?: () => void }) {
       : ollamaModels
 
   const answerLength = settings.answer_length ?? 'detailed'
+  const interviewLanguage = settings.interview_language ?? 'auto'
 
   return (
     <Popover>
@@ -93,6 +95,24 @@ export function ModelPicker({ onHelp }: { onHelp?: () => void }) {
             <SelectContent>
               {LENGTHS.map((l) => (
                 <SelectItem key={l.value} value={l.value}>
+                  {l.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <Field label="Language">
+          <Select
+            value={interviewLanguage}
+            onValueChange={(v) => void updateSetting('interview_language', v)}
+          >
+            <SelectTrigger className={TRIGGER_CLASS} aria-label="Interview language">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LANGUAGES.map((l) => (
+                <SelectItem key={l.code} value={l.code}>
                   {l.label}
                 </SelectItem>
               ))}
