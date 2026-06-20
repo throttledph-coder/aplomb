@@ -14,26 +14,31 @@ export class GroqWhisperTranscriber implements AudioTranscriber {
     this.client = new Groq({ apiKey })
   }
 
-  async transcribe(audio: Uint8Array): Promise<string> {
+  async transcribe(audio: Uint8Array, language?: string): Promise<string> {
     const file = await toFile(Buffer.from(audio), 'audio.webm')
-    const params = {
+    // Greedy decode for determinism. Fix the language when the user picked one
+    // (avoids misdetection on short clips); omit it for 'auto' so Whisper detects.
+    // The English punctuation hint only helps English/auto — skip it for other
+    // languages so it doesn't bias the transcript.
+    const fixed = language && language !== 'auto' ? language : undefined
+    const params: Record<string, unknown> = {
       file,
       model: WHISPER_MODEL,
-      // Tuned for live interview audio: fix the language (avoids misdetection on
-      // short clips), greedy decode for determinism, and a domain prompt that
-      // nudges Whisper to keep question punctuation ("?") the filter relies on.
-      language: 'en',
       temperature: 0,
-      prompt: "Transcribe the interviewer's question verbatim, with correct punctuation.",
-    } as const
+    }
+    if (fixed) params.language = fixed
+    if (!fixed || fixed === 'en') {
+      params.prompt = "Transcribe the interviewer's question verbatim, with correct punctuation."
+    }
+    const run = () => this.client.audio.transcriptions.create(params as never)
     try {
-      return (await this.client.audio.transcriptions.create(params)).text
+      return (await run()).text
     } catch (err) {
       // One short backoff on rate limits — Groq's free tier spikes during a
       // live session; a single retry absorbs most transient 429s.
       if ((err as { status?: number })?.status === 429) {
         await new Promise((r) => setTimeout(r, 1200))
-        return (await this.client.audio.transcriptions.create(params)).text
+        return (await run()).text
       }
       throw err
     }

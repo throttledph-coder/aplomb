@@ -17,6 +17,7 @@ import {
 import { cn } from '@/lib/utils'
 import { ApiKeyField } from '@/components/settings/ApiKeyField'
 import { useAppStore } from '@/store/app-store'
+import { LANGUAGES } from '@/lib/i18n/languages'
 
 const PROVIDERS = [
   { value: 'groq', label: 'Groq API', note: 'Recommended — free + fast', enabled: true },
@@ -195,6 +196,33 @@ export default function Settings() {
               {l.label}
             </button>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Language</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Language for transcription and generated answers. Auto-detect matches the interviewer's
+            language; pick one to force it (e.g. for a non-English interview).
+          </p>
+          <Select
+            value={settings.interview_language ?? 'auto'}
+            onValueChange={(v) => void updateSetting('interview_language', v)}
+          >
+            <SelectTrigger className="w-full" aria-label="Interview language">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LANGUAGES.map((l) => (
+                <SelectItem key={l.code} value={l.code}>
+                  {l.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
 
