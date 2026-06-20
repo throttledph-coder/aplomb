@@ -34,6 +34,8 @@ import { useSession } from '@/hooks/useSession'
 import { useAutoListen } from '@/hooks/useAutoListen'
 import { useAppStore } from '@/store/app-store'
 import { checkFeatureAccess } from '@/lib/plan'
+import { useNotesDraft } from '@/lib/notes/useNotesDraft'
+import { notesWidthFor, NOTES_STACK_BELOW } from '@/lib/notes/notes-width'
 import { cn } from '@/lib/utils'
 
 const ICON_BTN =
@@ -131,13 +133,32 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
     const w = Number(settings.overlay_notes_width ?? '260')
     return Number.isFinite(w) ? clampNotesWidth(w) : 260
   })
+  // Track the overlay window width so Notes stays responsive: it re-clamps to the
+  // window (chat never crushed) and, when too narrow, renders as a full-width
+  // sheet over the chat instead of squeezing it.
+  const [winWidth, setWinWidth] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 9999,
+  )
+  useEffect(() => {
+    const onResize = () => setWinWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  const stacked = winWidth < NOTES_STACK_BELOW
+  const effectiveNotesWidth = notesWidthFor(winWidth, notesWidth)
+
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const pinnedRef = useRef(true)
 
   // Opening the panel widens the WINDOW by the panel width (and vice versa) so
-  // the chat column keeps its size — side-by-side, never covered.
+  // the chat column keeps its size — side-by-side, never covered. The narrow
+  // full-width sheet doesn't widen (it can't fit, and covers the chat anyway).
   function toggleNotes() {
     setNotesOpen((open) => {
-      void window.overlay?.adjustWidth(open ? -notesWidth : notesWidth)
+      if (!stacked) {
+        void window.overlay?.adjustWidth(open ? -effectiveNotesWidth : effectiveNotesWidth)
+      }
       return !open
     })
   }
@@ -152,9 +173,17 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
   const showingLive = isGenerating || currentAnswer.length > 0
   const last = qaHistory[qaHistory.length - 1]
 
+  // Track whether the user is pinned to the bottom; only auto-scroll then, so
+  // streaming/Heard updates don't yank them while they read history or notes.
+  function onChatScroll() {
+    const el = scrollRef.current
+    if (!el) return
+    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  }
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [qaHistory.length, currentAnswer, isGenerating, auto.pending.length])
+    if (pinnedRef.current) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [qaHistory.length, currentAnswer, isGenerating, auto.pending.length, solveText])
 
   function submit() {
     const q = input.trim()
@@ -216,9 +245,14 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
         </button>
       </div>
 
-      {/* Assistant area + notes side panel — side-by-side, chat never covered */}
-      <div className="flex flex-1 overflow-hidden">
-        <div className="min-w-0 flex-1 space-y-3 overflow-y-auto px-3 py-2">
+      {/* Assistant area + notes side panel — side-by-side (or a full-width sheet
+          on a very narrow window so the chat is never crushed) */}
+      <div className="relative flex flex-1 overflow-hidden">
+        <div
+          ref={scrollRef}
+          onScroll={onChatScroll}
+          className="min-w-0 flex-1 space-y-3 overflow-y-auto px-3 py-2"
+        >
           {(solving || solveText) && (
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-2">
               <div className="mb-1 flex items-center gap-1.5">
@@ -301,7 +335,9 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
 
         {notesOpen && (
           <NotesPanel
-            width={notesWidth}
+            width={effectiveNotesWidth}
+            stacked={stacked}
+            onClose={toggleNotes}
             onLiveDelta={(dx) => setNotesWidth((w) => clampNotesWidth(w + dx))}
             onDragEnd={onNotesDragEnd}
           />
@@ -479,64 +515,72 @@ function OverlaySession({ sessionId }: { sessionId: number }) {
 // the interview_notes setting (debounced).
 function NotesPanel({
   width,
+  stacked,
+  onClose,
   onLiveDelta,
   onDragEnd,
 }: {
   width: number
+  stacked?: boolean
+  onClose: () => void
   onLiveDelta: (dx: number) => void
   onDragEnd: (totalDelta: number) => void
 }) {
-  const settings = useAppStore((s) => s.settings)
-  const updateSetting = useAppStore((s) => s.updateSetting)
-  const [text, setText] = useState(settings.interview_notes ?? '')
+  const { text, onChange } = useNotesDraft()
   const [preview, setPreview] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const drag = useRef<{ lastX: number; total: number } | null>(null)
 
-  function onChange(v: string) {
-    setText(v)
-    if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => void updateSetting('interview_notes', v), 600)
-  }
-
   return (
-    <div className="relative flex shrink-0 flex-col border-l bg-background" style={{ width }}>
-      {/* Drag handle on the panel's left edge (panel grows leftward). */}
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize notes panel"
-        onPointerDown={(e) => {
-          drag.current = { lastX: e.clientX, total: 0 }
-          e.currentTarget.setPointerCapture(e.pointerId)
-        }}
-        onPointerMove={(e) => {
-          if (!drag.current) return
-          const dx = drag.current.lastX - e.clientX
-          drag.current.lastX = e.clientX
-          drag.current.total += dx
-          onLiveDelta(dx)
-        }}
-        onPointerUp={(e) => {
-          const total = drag.current?.total ?? 0
-          drag.current = null
-          e.currentTarget.releasePointerCapture(e.pointerId)
-          onDragEnd(total)
-        }}
-        className="absolute inset-y-0 -left-0.5 z-10 w-1.5 transition-colors hover:bg-primary/40"
-      />
+    <div
+      className={cn(
+        'flex flex-col bg-background',
+        stacked ? 'absolute inset-0 z-20' : 'relative shrink-0 border-l',
+      )}
+      style={stacked ? undefined : { width }}
+    >
+      {/* Drag handle (left edge) — only in the side-by-side layout. */}
+      {!stacked && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize notes panel"
+          onPointerDown={(e) => {
+            drag.current = { lastX: e.clientX, total: 0 }
+            e.currentTarget.setPointerCapture(e.pointerId)
+          }}
+          onPointerMove={(e) => {
+            if (!drag.current) return
+            const dx = drag.current.lastX - e.clientX
+            drag.current.lastX = e.clientX
+            drag.current.total += dx
+            onLiveDelta(dx)
+          }}
+          onPointerUp={(e) => {
+            const total = drag.current?.total ?? 0
+            drag.current = null
+            e.currentTarget.releasePointerCapture(e.pointerId)
+            onDragEnd(total)
+          }}
+          className="absolute inset-y-0 -left-0.5 z-10 w-1.5 transition-colors hover:bg-primary/40"
+        />
+      )}
       <div className="flex items-center justify-between border-b px-3 py-1.5">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Notes
         </p>
-        <button
-          title={preview ? 'Edit' : 'Preview'}
-          aria-label={preview ? 'Edit notes' : 'Preview notes'}
-          onClick={() => setPreview((v) => !v)}
-          className={ICON_BTN}
-        >
-          {preview ? <Pencil className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            title={preview ? 'Edit' : 'Preview'}
+            aria-label={preview ? 'Edit notes' : 'Preview notes'}
+            onClick={() => setPreview((v) => !v)}
+            className={ICON_BTN}
+          >
+            {preview ? <Pencil className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+          </button>
+          <button title="Close notes" aria-label="Close notes" onClick={onClose} className={ICON_BTN}>
+            <X className="h-3 w-3" />
+          </button>
+        </div>
       </div>
       {preview ? (
         <div className="flex-1 overflow-y-auto px-3 py-2">
