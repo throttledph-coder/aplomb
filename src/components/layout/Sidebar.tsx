@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Home, History, FileText, Settings, Briefcase, CalendarDays, ChevronDown, LogOut, User, Sparkles, HelpCircle } from 'lucide-react'
+import { Home, History, FileText, Settings, Briefcase, CalendarDays, Dumbbell, ChevronDown, LogOut, User, Sparkles, HelpCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AplombMark } from '@/components/brand/Logo'
 import { useAppStore } from '@/store/app-store'
 
 const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
+  { to: '/practice', label: 'Practice', icon: Dumbbell, end: false },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays, end: false },
   { to: '/applications', label: 'Applications', icon: Briefcase, end: false },
   { to: '/history', label: 'History', icon: History, end: false },
