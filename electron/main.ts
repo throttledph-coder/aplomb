@@ -50,8 +50,11 @@ function createWindow() {
     title: 'Aplomb',
     width: 1280,
     height: 832,
-    minWidth: 1024,
-    minHeight: 720,
+    // Lower min so the app stays usable at half-screen / smaller laptops; the
+    // pages' responsive breakpoints (lg/md rail-stacking, Kanban h-scroll) engage
+    // below 1024.
+    minWidth: 880,
+    minHeight: 620,
     center: true,
     icon: path.join(process.env.VITE_PUBLIC, 'icon.png'),
     autoHideMenuBar: true,
