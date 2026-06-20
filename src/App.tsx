@@ -9,6 +9,7 @@ import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
 import History from '@/pages/History'
 import Practice from '@/pages/Practice'
+import Notes from '@/pages/Notes'
 import ResumeManager from '@/pages/ResumeManager'
 import Settings from '@/pages/Settings'
 import Onboarding from '@/pages/Onboarding'
@@ -89,6 +90,7 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/history" element={<History />} />
             <Route path="/practice" element={<Practice />} />
+            <Route path="/notes" element={<Notes />} />
             <Route path="/applications" element={<Applications />} />
             <Route path="/applications/:id" element={<ApplicationDetail />} />
             <Route path="/calendar" element={<Calendar />} />
